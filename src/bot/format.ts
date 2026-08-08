@@ -151,7 +151,7 @@ export function teamText(
 
   const lines = ["👥 <b>Team</b>", ""];
   for (const member of members) {
-    const badge = member.role === "admin" ? "👑" : "👤";
+    const badge = member.role === "admin" ? "⛑️" : "👤";
     lines.push(`${badge}  ${mention(member)}`);
   }
   return lines.join("\n");
