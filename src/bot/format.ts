@@ -34,7 +34,7 @@ export function formatBoard(input: {
   done: TaskWithAssignee[];
   timezone: string;
 }): string {
-  const lines: string[] = ["🎯 *taptopia board*", ""];
+  const lines: string[] = ["🎯 *TapTopia Board*", ""];
 
   for (const status of STATUS_ORDER) {
     const bucket =
