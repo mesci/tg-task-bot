@@ -4,6 +4,7 @@ import { syncBoard } from "@/bot/board";
 import { formatTaskCard } from "@/bot/format";
 import { createPriorityKeyboard, taskKeyboard } from "@/bot/keyboards";
 import { finalizeTaskCreate } from "@/bot/handlers/callbacks";
+import { isMenuText } from "@/bot/menu";
 import { clearDraft, getDraft, readPayload, setDraft } from "@/lib/drafts";
 import { getSettings } from "@/lib/settings";
 import { getTask, updateTask } from "@/lib/tasks";
@@ -12,6 +13,11 @@ import { parseDueInput } from "@/lib/time";
 export function registerConversations(bot: Bot) {
   bot.on("message:text", async (ctx, next) => {
     if (ctx.message.text.startsWith("/")) {
+      await next();
+      return;
+    }
+
+    if (isMenuText(ctx.message.text.trim())) {
       await next();
       return;
     }
@@ -38,9 +44,10 @@ export function registerConversations(bot: Bot) {
         step: "create_description",
         payload: { title: text },
       });
-      await ctx.reply("📝 Description? Send text, or `skip`.", {
-        parse_mode: "Markdown",
-      });
+      await ctx.reply(
+        "📝 Description?\nSend text, or <code>skip</code>.",
+        { parse_mode: "HTML" },
+      );
       return;
     }
 
@@ -69,8 +76,8 @@ export function registerConversations(bot: Bot) {
         text.toLowerCase() !== "none"
       ) {
         await ctx.reply(
-          "❓ Couldn't parse that. Try `YYYY-MM-DD`, `today`, `tomorrow`, or `skip`.",
-          { parse_mode: "Markdown" },
+          "❓ Couldn't parse that.\nTry <code>YYYY-MM-DD</code> or <code>skip</code>.",
+          { parse_mode: "HTML" },
         );
         return;
       }
@@ -97,7 +104,7 @@ export function registerConversations(bot: Bot) {
       await clearDraft(String(ctx.from.id));
       if (updated) {
         await ctx.reply(formatTaskCard(updated, settings.timezone), {
-          parse_mode: "Markdown",
+          parse_mode: "HTML",
           reply_markup: taskKeyboard(updated),
         });
       }
@@ -114,8 +121,8 @@ export function registerConversations(bot: Bot) {
         due === null
       ) {
         await ctx.reply(
-          "❓ Couldn't parse that. Try `YYYY-MM-DD`, `today`, `tomorrow`, or `skip`.",
-          { parse_mode: "Markdown" },
+          "❓ Couldn't parse that.\nTry <code>YYYY-MM-DD</code> or <code>skip</code>.",
+          { parse_mode: "HTML" },
         );
         return;
       }
@@ -127,14 +134,14 @@ export function registerConversations(bot: Bot) {
       await clearDraft(String(ctx.from.id));
       if (updated) {
         await ctx.reply(formatTaskCard(updated, settings.timezone), {
-          parse_mode: "Markdown",
+          parse_mode: "HTML",
           reply_markup: taskKeyboard(updated),
         });
       } else {
         const task = await getTask(payload.taskId);
         if (task) {
           await ctx.reply(formatTaskCard(task, settings.timezone), {
-            parse_mode: "Markdown",
+            parse_mode: "HTML",
             reply_markup: taskKeyboard(task),
           });
         }
@@ -145,7 +152,7 @@ export function registerConversations(bot: Bot) {
 
     if (draft.step === "focus" || draft.step === "standup") {
       await clearDraft(String(ctx.from.id));
-      await ctx.reply("❌ That command was removed. Use /task or /mine.");
+      await ctx.reply("❌ That flow was removed.");
       return;
     }
 

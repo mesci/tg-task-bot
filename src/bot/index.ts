@@ -3,6 +3,7 @@ import { env } from "@/lib/env";
 import { ensureSchema } from "@/lib/db";
 import { registerCommands } from "@/bot/handlers/commands";
 import { registerCallbacks } from "@/bot/handlers/callbacks";
+import { registerMenu } from "@/bot/handlers/menu";
 import { registerConversations } from "@/bot/handlers/conversations";
 
 declare global {
@@ -21,6 +22,7 @@ export function getBot(): Bot {
 
   registerCommands(bot);
   registerCallbacks(bot);
+  registerMenu(bot);
   registerConversations(bot);
 
   bot.catch((err) => {

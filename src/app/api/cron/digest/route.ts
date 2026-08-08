@@ -27,20 +27,20 @@ export async function GET(request: Request) {
   const doing = open.filter((task) => task.status === "doing");
 
   const lines = [
-    "📊 *Weekly digest*",
+    "📊 <b>Weekly digest</b>",
     "",
-    `✅ *Done this week* · ${completed.length}`,
+    `✅ <b>Done this week</b> · ${completed.length}`,
     ...completed
       .slice(0, 12)
       .map((task) => `• ${taskRef(task.id)} ${task.title}`),
     "",
-    `🔵 *In motion* · ${doing.length}`,
+    `🔵 <b>In motion</b> · ${doing.length}`,
     ...doing.slice(0, 10).map(
       (task) =>
         `• ${taskRef(task.id)} ${task.title}${task.assignee ? ` — ${mention(task.assignee)}` : ""}`,
     ),
     "",
-    `🔴 *Blocked* · ${blocked.length}`,
+    `🔴 <b>Blocked</b> · ${blocked.length}`,
     ...blocked.slice(0, 10).map(
       (task) =>
         `• ${taskRef(task.id)} ${task.title}${task.blockedReason ? ` — ${task.blockedReason}` : ""}`,

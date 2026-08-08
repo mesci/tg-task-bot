@@ -26,7 +26,7 @@ export async function syncBoard(api: Api): Promise<void> {
         settings.boardMessageId,
         text,
         {
-          parse_mode: "Markdown",
+          parse_mode: "HTML",
           reply_markup: boardKeyboard(),
         },
       );
@@ -35,7 +35,7 @@ export async function syncBoard(api: Api): Promise<void> {
   }
 
   const message = await api.sendMessage(settings.chatId, text, {
-    parse_mode: "Markdown",
+    parse_mode: "HTML",
     reply_markup: boardKeyboard(),
     ...thread,
   });
@@ -57,7 +57,7 @@ export async function postToBoard(
     settings.topicId != null ? { message_thread_id: settings.topicId } : {};
 
   return api.sendMessage(settings.chatId, text, {
-    parse_mode: "Markdown",
+    parse_mode: "HTML",
     reply_markup: replyMarkup,
     ...thread,
   });

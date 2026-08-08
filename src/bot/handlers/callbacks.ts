@@ -1,5 +1,11 @@
 import type { Bot, Context } from "grammy";
 import { gateMember, isAllowedRoom } from "@/bot/access";
+import {
+  showBoard,
+  showMine,
+  showTeam,
+  startCreateTask,
+} from "@/bot/actions";
 import { postToBoard, syncBoard } from "@/bot/board";
 import { formatTaskCard } from "@/bot/format";
 import {
@@ -19,7 +25,7 @@ import {
   getTask,
   updateTask,
 } from "@/lib/tasks";
-import { mention, taskRef } from "@/lib/labels";
+import { escapeHtml, mention, taskRef } from "@/lib/labels";
 
 export function registerCallbacks(bot: Bot) {
   bot.on("callback_query:data", async (ctx) => {
@@ -27,11 +33,11 @@ export function registerCallbacks(bot: Bot) {
 
     if (data === "board:refresh") {
       await syncBoard(ctx.api);
-      await ctx.answerCallbackQuery({ text: "🔄 Board refreshed" });
+      await ctx.answerCallbackQuery({ text: "🔄 Refreshed" });
       return;
     }
 
-    if (data === "board:new") {
+    if (data === "board:new" || data === "menu:task") {
       const member = await gateMember(ctx);
       if (!member) {
         await ctx.answerCallbackQuery({
@@ -40,14 +46,26 @@ export function registerCallbacks(bot: Bot) {
         });
         return;
       }
-      await setDraft({
-        telegramId: String(ctx.from.id),
-        chatId: String(ctx.chat?.id ?? ctx.from.id),
-        topicId: ctx.callbackQuery.message?.message_thread_id ?? null,
-        step: "create_title",
-      });
       await ctx.answerCallbackQuery();
-      await ctx.reply("🛠 What's the task title?");
+      await startCreateTask(ctx);
+      return;
+    }
+
+    if (data === "menu:board") {
+      await ctx.answerCallbackQuery();
+      await showBoard(ctx);
+      return;
+    }
+
+    if (data === "menu:mine") {
+      await ctx.answerCallbackQuery();
+      await showMine(ctx);
+      return;
+    }
+
+    if (data === "menu:team") {
+      await ctx.answerCallbackQuery();
+      await showTeam(ctx);
       return;
     }
 
@@ -81,7 +99,7 @@ async function handleCreatePriority(ctx: Context, priority: string) {
   const draft = await getDraft(String(ctx.from!.id));
   if (!draft || draft.step !== "create_priority") {
     await ctx.answerCallbackQuery({
-      text: "Start with /task",
+      text: "Start a new task first",
       show_alert: true,
     });
     return;
@@ -119,7 +137,7 @@ async function handleCreateAssign(ctx: Context, rawId: string) {
   const draft = await getDraft(String(ctx.from!.id));
   if (!draft || draft.step !== "create_assignee") {
     await ctx.answerCallbackQuery({
-      text: "Start with /task",
+      text: "Start a new task first",
       show_alert: true,
     });
     return;
@@ -140,8 +158,8 @@ async function handleCreateAssign(ctx: Context, rawId: string) {
 
   await ctx.answerCallbackQuery();
   await ctx.editMessageText(
-    "📅 Due date?\nSend `YYYY-MM-DD`, `today`, `tomorrow`, or `skip`.",
-    { parse_mode: "Markdown" },
+    "📅 <b>Due date?</b>\nSend <code>YYYY-MM-DD</code>, <code>today</code>, <code>tomorrow</code>, or <code>skip</code>.",
+    { parse_mode: "HTML" },
   );
 }
 
@@ -173,10 +191,17 @@ async function handleTaskAction(bot: Bot, ctx: Context, data: string) {
 
   const settings = await getSettings();
 
-  if (action === "open") {
+  if (action === "open" || action === "show") {
     await ctx.answerCallbackQuery();
+    if (action === "show") {
+      await ctx.reply(formatTaskCard(task, settings.timezone), {
+        parse_mode: "HTML",
+        reply_markup: taskKeyboard(task),
+      });
+      return;
+    }
     await ctx.editMessageText(formatTaskCard(task, settings.timezone), {
-      parse_mode: "Markdown",
+      parse_mode: "HTML",
       reply_markup: taskKeyboard(task),
     });
     return;
@@ -190,7 +215,7 @@ async function handleTaskAction(bot: Bot, ctx: Context, data: string) {
     await ctx.answerCallbackQuery({ text: "✋ Claimed" });
     if (updated) {
       await ctx.editMessageText(formatTaskCard(updated, settings.timezone), {
-        parse_mode: "Markdown",
+        parse_mode: "HTML",
         reply_markup: taskKeyboard(updated),
       });
     }
@@ -211,7 +236,7 @@ async function handleTaskAction(bot: Bot, ctx: Context, data: string) {
     await ctx.answerCallbackQuery({ text: labels[action] });
     if (updated) {
       await ctx.editMessageText(formatTaskCard(updated, settings.timezone), {
-        parse_mode: "Markdown",
+        parse_mode: "HTML",
         reply_markup: taskKeyboard(updated),
       });
     }
@@ -228,7 +253,9 @@ async function handleTaskAction(bot: Bot, ctx: Context, data: string) {
       payload: { taskId },
     });
     await ctx.answerCallbackQuery();
-    await ctx.reply(`🔴 Why is ${taskRef(taskId)} blocked?`);
+    await ctx.reply(`🔴 Why is <b>${taskRef(taskId)}</b> blocked?`, {
+      parse_mode: "HTML",
+    });
     return;
   }
 
@@ -247,7 +274,7 @@ async function handleTaskAction(bot: Bot, ctx: Context, data: string) {
     await ctx.answerCallbackQuery({ text: "⚡ Priority updated" });
     if (updated) {
       await ctx.editMessageText(formatTaskCard(updated, settings.timezone), {
-        parse_mode: "Markdown",
+        parse_mode: "HTML",
         reply_markup: taskKeyboard(updated),
       });
     }
@@ -265,8 +292,8 @@ async function handleTaskAction(bot: Bot, ctx: Context, data: string) {
     });
     await ctx.answerCallbackQuery();
     await ctx.reply(
-      `📅 New due date for ${taskRef(taskId)}?\n\`YYYY-MM-DD\`, \`today\`, \`tomorrow\`, or \`skip\`.`,
-      { parse_mode: "Markdown" },
+      `📅 New due date for <b>${taskRef(taskId)}</b>?\n<code>YYYY-MM-DD</code>, <code>today</code>, <code>tomorrow</code>, or <code>skip</code>.`,
+      { parse_mode: "HTML" },
     );
     return;
   }
@@ -286,13 +313,13 @@ async function handleTaskAction(bot: Bot, ctx: Context, data: string) {
     await ctx.answerCallbackQuery({ text: "🔁 Handed off" });
     if (updated) {
       await ctx.editMessageText(formatTaskCard(updated, settings.timezone), {
-        parse_mode: "Markdown",
+        parse_mode: "HTML",
         reply_markup: taskKeyboard(updated),
       });
       await notifyAssignee(
         bot,
         assigneeId,
-        `🔁 Handed to you: ${taskRef(taskId)} *${task.title}*\nfrom ${mention(member)}`,
+        `🔁 Handed to you: <b>${taskRef(taskId)}</b> ${escapeHtml(task.title)}\nfrom ${mention(member)}`,
       );
     }
     await syncBoard(ctx.api);
@@ -307,7 +334,7 @@ async function handleTaskAction(bot: Bot, ctx: Context, data: string) {
     await ctx.answerCallbackQuery({ text: "👤 Assignee updated" });
     if (updated) {
       await ctx.editMessageText(formatTaskCard(updated, settings.timezone), {
-        parse_mode: "Markdown",
+        parse_mode: "HTML",
         reply_markup: taskKeyboard(updated),
       });
     }
@@ -326,7 +353,9 @@ async function handleTaskAction(bot: Bot, ctx: Context, data: string) {
   if (action === "del") {
     await deleteTask(taskId);
     await ctx.answerCallbackQuery({ text: "🗑 Deleted" });
-    await ctx.editMessageText(`🗑 Deleted ${taskRef(taskId)}.`);
+    await ctx.editMessageText(`🗑 Deleted <b>${taskRef(taskId)}</b>.`, {
+      parse_mode: "HTML",
+    });
     await syncBoard(ctx.api);
     return;
   }
@@ -361,7 +390,7 @@ export async function finalizeTaskCreate(bot: Bot, ctx: Context) {
     await updateTask(task.id, { messageId: message.message_id });
   } catch {
     await ctx.reply(card, {
-      parse_mode: "Markdown",
+      parse_mode: "HTML",
       reply_markup: taskKeyboard(task),
     });
   }
@@ -370,8 +399,10 @@ export async function finalizeTaskCreate(bot: Bot, ctx: Context) {
   await notifyAssignee(
     bot,
     task.assigneeId,
-    `🛠 Assigned to you: ${taskRef(task.id)} *${task.title}*`,
+    `🛠 Assigned to you: <b>${taskRef(task.id)}</b> ${escapeHtml(task.title)}`,
   );
-  await ctx.reply(`✅ Created ${taskRef(task.id)}.`);
+  await ctx.reply(`✅ Created <b>${taskRef(task.id)}</b>.`, {
+    parse_mode: "HTML",
+  });
   return true;
 }

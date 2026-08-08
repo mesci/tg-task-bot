@@ -28,13 +28,20 @@ export const PRIORITY_EMOJI: Record<string, string> = {
 
 export const STATUS_ORDER = ["doing", "blocked", "todo", "done"] as const;
 
+export function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 export function mention(member: {
   username: string | null;
   displayName: string;
   telegramId: string;
 }): string {
-  if (member.username) return `@${member.username}`;
-  return `[${member.displayName}](tg://user?id=${member.telegramId})`;
+  if (member.username) return `@${escapeHtml(member.username)}`;
+  return `<a href="tg://user?id=${member.telegramId}">${escapeHtml(member.displayName)}</a>`;
 }
 
 export function taskRef(id: number): string {

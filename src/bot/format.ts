@@ -4,6 +4,7 @@ import {
   STATUS_EMOJI,
   STATUS_LABEL,
   STATUS_ORDER,
+  escapeHtml,
   mention,
   taskRef,
 } from "@/lib/labels";
@@ -15,18 +16,18 @@ export function formatTaskLine(
   task: TaskWithAssignee,
   timezone: string,
 ): string {
-  const who = task.assignee ? mention(task.assignee) : "_unassigned_";
+  const who = task.assignee ? mention(task.assignee) : "<i>unassigned</i>";
   const due = task.dueAt
     ? ` · 📅 ${formatShortDate(task.dueAt, timezone)}`
     : "";
   const blocked =
     task.status === "blocked" && task.blockedReason
-      ? `\n    💬 ${escapeMarkdown(task.blockedReason)}`
+      ? `\n      <i>💬 ${escapeHtml(task.blockedReason)}</i>`
       : "";
   const prio =
     task.priority !== "normal" ? `${PRIORITY_EMOJI[task.priority]} ` : "";
 
-  return `${STATUS_EMOJI[task.status]} ${taskRef(task.id)} ${prio}*${escapeMarkdown(task.title)}*\n    👤 ${who}${due}${blocked}`;
+  return `${STATUS_EMOJI[task.status]} <b>${taskRef(task.id)}</b> ${prio}${escapeHtml(task.title)}\n      👤 ${who}${due}${blocked}`;
 }
 
 export function formatBoard(input: {
@@ -34,7 +35,14 @@ export function formatBoard(input: {
   done: TaskWithAssignee[];
   timezone: string;
 }): string {
-  const lines: string[] = ["🎯 *TapTopia Board*", ""];
+  const openCount = input.open.length;
+  const lines: string[] = [
+    "🎯 <b>taptopia</b>",
+    `<i>${openCount} open task${openCount === 1 ? "" : "s"}</i>`,
+    "",
+  ];
+
+  let hasContent = false;
 
   for (const status of STATUS_ORDER) {
     const bucket =
@@ -42,20 +50,19 @@ export function formatBoard(input: {
         ? input.done
         : input.open.filter((task) => task.status === status);
     if (bucket.length === 0) continue;
-    lines.push(`${STATUS_LABEL[status]}`);
-    for (const task of bucket.slice(0, status === "done" ? 6 : 20)) {
+    hasContent = true;
+    lines.push(`${STATUS_LABEL[status]} <b>· ${bucket.length}</b>`);
+    for (const task of bucket.slice(0, status === "done" ? 5 : 15)) {
       lines.push(formatTaskLine(task, input.timezone));
       lines.push("");
     }
   }
 
-  if (lines.length === 2) {
-    lines.push("_No open tasks yet._");
-    lines.push("_Tap *New task* or send /task_");
+  if (!hasContent) {
+    lines.push("✨ <i>Board is clear.</i>");
+    lines.push("<i>Tap ➕ New task to start.</i>");
   }
 
-  lines.push("────────────");
-  lines.push("🛠 /task   👤 /mine   📌 /board");
   return lines.join("\n").trim();
 }
 
@@ -64,28 +71,28 @@ export function formatTaskCard(
   timezone: string,
 ): string {
   const lines = [
-    `${STATUS_EMOJI[task.status]} *${taskRef(task.id)} ${escapeMarkdown(task.title)}*`,
-    "",
-    `📊 ${STATUS_LABEL[task.status]}`,
-    `⚡ ${PRIORITY_LABEL[task.priority]}`,
+    `${STATUS_EMOJI[task.status]} <b>${taskRef(task.id)}</b>  ${escapeHtml(task.title)}`,
+    "──────────────",
+    `📊  ${STATUS_LABEL[task.status]}`,
+    `⚡  ${PRIORITY_LABEL[task.priority]}`,
   ];
 
   if (task.description) {
     lines.push("");
-    lines.push(`📝 ${escapeMarkdown(task.description)}`);
+    lines.push(`📝  ${escapeHtml(task.description)}`);
   }
 
   lines.push("");
   lines.push(
-    `👤 ${task.assignee ? mention(task.assignee) : "_unassigned_"}`,
+    `👤  ${task.assignee ? mention(task.assignee) : "<i>unassigned</i>"}`,
   );
 
   if (task.dueAt) {
-    lines.push(`📅 ${formatDue(task.dueAt, timezone)}`);
+    lines.push(`📅  ${formatDue(task.dueAt, timezone)}`);
   }
 
   if (task.status === "blocked" && task.blockedReason) {
-    lines.push(`🚫 ${escapeMarkdown(task.blockedReason)}`);
+    lines.push(`🚫  ${escapeHtml(task.blockedReason)}`);
   }
 
   return lines.join("\n");
@@ -97,45 +104,55 @@ export function formatMine(
   timezone: string,
 ): string {
   if (tasks.length === 0) {
-    return `👤 *Your tasks*\n\nNothing open for ${mention(member)}.\n_Create one with /task_`;
+    return [
+      "👤 <b>Your tasks</b>",
+      "",
+      `Hey ${mention(member)} — inbox zero.`,
+      "<i>Tap ➕ New task when you're ready.</i>",
+    ].join("\n");
   }
 
-  const lines = [`👤 *Your tasks* · ${mention(member)}`, ""];
+  const lines = [
+    `👤 <b>Your tasks</b> · ${mention(member)}`,
+    `<i>${tasks.length} open</i>`,
+    "",
+  ];
+
   for (const task of tasks) {
     const due = task.dueAt
       ? ` · 📅 ${formatShortDate(task.dueAt, timezone)}`
       : "";
     lines.push(
-      `${STATUS_EMOJI[task.status]} ${taskRef(task.id)} *${escapeMarkdown(task.title)}*${due}`,
+      `${STATUS_EMOJI[task.status]} <b>${taskRef(task.id)}</b>  ${escapeHtml(task.title)}${due}`,
     );
   }
-  lines.push("", `_Open a card: /task ${tasks[0].id}_`);
-  return lines.join("\n");
-}
 
-export function escapeMarkdown(value: string): string {
-  return value.replace(/([_*`\[])/g, "\\$1");
+  lines.push("");
+  lines.push("<i>Tap a task below to open it.</i>");
+  return lines.join("\n");
 }
 
 export function helpText(): string {
   return [
-    "🎯 *taptopia*",
-    "Team tasks, right inside Telegram.",
+    "🎯 <b>taptopia</b>",
+    "Team tasks inside Telegram — no second app.",
     "",
-    "*Commands*",
-    "📌 /board — live board",
-    "🛠 /task — create a task",
-    "🛠 /task 12 — open task #12",
-    "👤 /mine — your open tasks",
-    "👥 /members — team list",
-    "❌ /cancel — cancel current flow",
-    "",
-    "*Task buttons*",
-    "✋ Claim · 🔵 Doing · 🔴 Blocked · ✅ Done",
-    "🔁 Handoff · ⚡ Priority · 📅 Due · 🗑 Delete",
-    "",
-    "*Setup*",
-    "🔗 /bind — bind this topic",
-    "🚪 /join — join the team",
+    "Use the menu buttons under the chat,",
+    "or the actions below.",
   ].join("\n");
+}
+
+export function teamText(
+  members: { role: string; username: string | null; displayName: string; telegramId: string }[],
+): string {
+  if (members.length === 0) {
+    return "👥 <b>Team</b>\n\nNo members yet.";
+  }
+
+  const lines = ["👥 <b>Team</b>", ""];
+  for (const member of members) {
+    const badge = member.role === "admin" ? "👑" : "👤";
+    lines.push(`${badge}  ${mention(member)}`);
+  }
+  return lines.join("\n");
 }
