@@ -43,6 +43,20 @@ export async function syncBoard(api: Api): Promise<void> {
   await updateSettings({ boardMessageId: message.message_id });
 }
 
+export async function recreateBoard(api: Api): Promise<void> {
+  const settings = await getSettings();
+  if (!settings.chatId) return;
+
+  if (settings.boardMessageId) {
+    try {
+      await api.deleteMessage(settings.chatId, settings.boardMessageId);
+    } catch {}
+    await updateSettings({ boardMessageId: null });
+  }
+
+  await syncBoard(api);
+}
+
 export async function postToBoard(
   api: Api,
   text: string,

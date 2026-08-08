@@ -2,6 +2,18 @@ import { InlineKeyboard } from "grammy";
 import type { Member, Task } from "@/lib/db";
 import type { TaskWithAssignee } from "@/lib/tasks";
 
+export function withDismiss(
+  ownerTelegramId: string,
+  base?: InlineKeyboard,
+): InlineKeyboard {
+  const kb = base
+    ? new InlineKeyboard(
+        base.inline_keyboard.map((row) => row.map((button) => ({ ...button }))),
+      )
+    : new InlineKeyboard();
+  return kb.row().text("🗑 Dismiss", `d:${ownerTelegramId}`).danger();
+}
+
 export function taskKeyboard(task: Task): InlineKeyboard {
   const kb = new InlineKeyboard();
 

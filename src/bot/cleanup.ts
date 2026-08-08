@@ -1,5 +1,7 @@
 import type { Api, Context } from "grammy";
+import { InlineKeyboard } from "grammy";
 import { threadIdFromCtx, threadOptions } from "@/bot/access";
+import { withDismiss } from "@/bot/keyboards";
 import {
   clearDraft,
   getDraft,
@@ -59,7 +61,29 @@ export async function sendFresh(
   const prev = draft ? readPayload(draft) : {};
 
   const extraObj =
-    extra && typeof extra === "object" ? (extra as Record<string, unknown>) : {};
+    extra && typeof extra === "object"
+      ? { ...(extra as Record<string, unknown>) }
+      : {};
+
+  const markup = extraObj.reply_markup;
+  if (!markup) {
+    extraObj.reply_markup = withDismiss(telegramId);
+  } else if (markup instanceof InlineKeyboard) {
+    extraObj.reply_markup = withDismiss(telegramId, markup);
+  } else if (
+    typeof markup === "object" &&
+    markup !== null &&
+    "inline_keyboard" in markup
+  ) {
+    extraObj.reply_markup = withDismiss(
+      telegramId,
+      new InlineKeyboard(
+        (markup as InlineKeyboard).inline_keyboard.map((row) =>
+          row.map((button) => ({ ...button })),
+        ),
+      ),
+    );
+  }
 
   const message = await ctx.reply(text, {
     ...extraObj,

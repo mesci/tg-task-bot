@@ -1,6 +1,6 @@
 import type { Context } from "grammy";
 import { gateAdmin, gateMember } from "@/bot/access";
-import { renderBoardText, syncBoard } from "@/bot/board";
+import { recreateBoard, renderBoardText } from "@/bot/board";
 import {
   clearFlow,
   scrubTrigger,
@@ -19,7 +19,6 @@ import {
   mineKeyboard,
   taskKeyboard,
 } from "@/bot/keyboards";
-import { mainKeyboard } from "@/bot/menu";
 import { listActiveMembers } from "@/lib/members";
 import { getSettings } from "@/lib/settings";
 import { getTask, listTasksForMember } from "@/lib/tasks";
@@ -31,7 +30,7 @@ export async function sendHelp(ctx: Context) {
     helpText(),
     {
       parse_mode: "HTML",
-      reply_markup: mainKeyboard(),
+      reply_markup: helpKeyboard(),
     },
     "idle",
     {},
@@ -46,7 +45,7 @@ export async function showBoard(ctx: Context) {
     await sendFresh(
       ctx,
       "🚪 Join the team first.",
-      { reply_markup: mainKeyboard() },
+      { reply_markup: helpKeyboard() },
       "idle",
       {},
       true,
@@ -59,7 +58,7 @@ export async function showBoard(ctx: Context) {
     await sendFresh(
       ctx,
       "🔗 An admin needs to bind the board room first.",
-      { reply_markup: mainKeyboard() },
+      { reply_markup: helpKeyboard() },
       "idle",
       {},
       true,
@@ -67,7 +66,7 @@ export async function showBoard(ctx: Context) {
     return;
   }
 
-  await syncBoard(ctx.api);
+  await recreateBoard(ctx.api);
 
   if (ctx.chat?.type === "private") {
     const text = await renderBoardText();
@@ -98,7 +97,7 @@ export async function showMine(ctx: Context) {
     await sendFresh(
       ctx,
       "🚪 You're not on the team yet.",
-      { reply_markup: mainKeyboard() },
+      { reply_markup: helpKeyboard() },
       "idle",
       {},
       true,
@@ -129,7 +128,7 @@ export async function showTeam(ctx: Context) {
     teamText(members),
     {
       parse_mode: "HTML",
-      reply_markup: mainKeyboard(),
+      reply_markup: helpKeyboard(),
     },
     "idle",
     {},
@@ -145,7 +144,7 @@ export async function startCreateTask(ctx: Context) {
     await sendFresh(
       ctx,
       "🚪 Join the team first.",
-      { reply_markup: mainKeyboard() },
+      { reply_markup: helpKeyboard() },
       "idle",
       {},
       true,
@@ -192,7 +191,7 @@ export async function cancelFlow(ctx: Context) {
   await sendFresh(
     ctx,
     "❌ Cancelled.",
-    { reply_markup: mainKeyboard() },
+    { reply_markup: helpKeyboard() },
     "idle",
     {},
     true,

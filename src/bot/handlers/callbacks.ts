@@ -1,5 +1,5 @@
 import type { Bot, Context } from "grammy";
-import { gateMember } from "@/bot/access";
+import { gateAdmin, gateMember } from "@/bot/access";
 import {
   showBoard,
   showMine,
@@ -68,6 +68,42 @@ export function registerCallbacks(bot: Bot) {
       if (data === "menu:team") {
         await ctx.answerCallbackQuery();
         await showTeam(ctx);
+        return;
+      }
+
+      if (data.startsWith("d:")) {
+        const ownerId = data.slice(2);
+        const allowed =
+          String(ctx.from.id) === ownerId || (await gateAdmin(ctx));
+        if (!allowed) {
+          await ctx.answerCallbackQuery({
+            text: "Only the author or an admin can dismiss this.",
+            show_alert: true,
+          });
+          return;
+        }
+
+        await ctx.answerCallbackQuery({ text: "🗑 Dismissed" });
+        if (ctx.chat && ctx.callbackQuery.message) {
+          const messageId = ctx.callbackQuery.message.message_id;
+          await deleteQuietly(ctx.api, ctx.chat.id, messageId);
+          const draft = await getDraft(String(ctx.from.id));
+          if (draft) {
+            const payload = readPayload(draft);
+            if (payload.promptMessageId === messageId) {
+              await clearFlow(ctx.api, String(ctx.from.id));
+            }
+          }
+          if (String(ctx.from.id) !== ownerId) {
+            const ownerDraft = await getDraft(ownerId);
+            if (ownerDraft) {
+              const payload = readPayload(ownerDraft);
+              if (payload.promptMessageId === messageId) {
+                await clearFlow(ctx.api, ownerId);
+              }
+            }
+          }
+        }
         return;
       }
 
