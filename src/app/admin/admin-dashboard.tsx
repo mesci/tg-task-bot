@@ -667,10 +667,9 @@ function SettingsPanel({
           Set webhook
         </button>
         <div className="rounded-2xl bg-mist/80 p-4 text-sm text-muted">
-          <p>Cron routes expect Authorization: Bearer CRON_SECRET</p>
-          <p className="mt-2">/api/cron/reminders · hourly</p>
-          <p>/api/cron/standup · weekdays 08:00 UTC</p>
-          <p>/api/cron/digest · Friday 16:00 UTC</p>
+          <p>Cron expects Authorization: Bearer CRON_SECRET</p>
+          <p className="mt-2">/api/cron/daily · 08:00 UTC</p>
+          <p>Reminders every day · pulse on weekdays · digest on Friday</p>
         </div>
       </div>
     </section>
