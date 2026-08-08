@@ -37,7 +37,7 @@ export function formatBoard(input: {
 }): string {
   const openCount = input.open.length;
   const lines: string[] = [
-    "🎯 <b>taptopia</b>",
+    "🟨 <b>TAPTOPIA BOARD</b>",
     `<i>${openCount} open task${openCount === 1 ? "" : "s"}</i>`,
     "",
   ];

@@ -10,7 +10,7 @@ export function taskKeyboard(task: Task): InlineKeyboard {
       kb.text("✋ Claim", `t:${task.id}:claim`).primary().row();
     }
 
-    kb.text("📋 Todo", `t:${task.id}:todo`)
+    kb.text("📋 ", `t:${task.id}:todo`)
       .text("🔵 Doing", `t:${task.id}:doing`)
       .primary()
       .row();

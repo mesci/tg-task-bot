@@ -59,7 +59,7 @@ export async function ensureSchema(): Promise<void> {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
         description TEXT,
-        status TEXT NOT NULL DEFAULT 'todo',
+        status TEXT NOT NULL DEFAULT '',
         priority TEXT NOT NULL DEFAULT 'normal',
         assignee_id INTEGER REFERENCES members(id),
         created_by_id INTEGER REFERENCES members(id),
