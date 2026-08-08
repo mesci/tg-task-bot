@@ -135,7 +135,7 @@ export function formatMine(
 export function helpText(): string {
   return [
     "🎯 <b>taptopia</b>",
-    "Team tasks inside Telegram — no second app.",
+    "TapTopia Team tasks inside Telegram..",
     "",
     "Use the menu buttons under the chat,",
     "or the actions below.",
