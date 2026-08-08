@@ -65,13 +65,27 @@ export function registerCommands(bot: Bot) {
   });
 
   bot.command("bind", async (ctx) => {
-    if (!(await gateAdmin(ctx))) {
-      await ctx.reply("Admins only.");
+    if (!ctx.chat || ctx.chat.type === "private") {
+      await ctx.reply("Run /bind inside the team topic.");
       return;
     }
 
-    if (!ctx.chat || ctx.chat.type === "private") {
-      await ctx.reply("Run /bind inside the team topic.");
+    const user = ctx.from!;
+    let isAdmin = await gateAdmin(ctx);
+    const members = await listActiveMembers();
+
+    if (!isAdmin && members.length === 0) {
+      await upsertMember({
+        telegramId: String(user.id),
+        username: user.username ?? null,
+        displayName: displayNameFromCtx(ctx),
+        role: "admin",
+      });
+      isAdmin = true;
+    }
+
+    if (!isAdmin) {
+      await ctx.reply("Admins only. Run /join first, or get added from the admin panel.");
       return;
     }
 
@@ -90,6 +104,7 @@ export function registerCommands(bot: Bot) {
       { parse_mode: "Markdown" },
     );
   });
+
 
   bot.command("board", async (ctx) => {
     if (!(await isAllowedRoom(ctx))) return;

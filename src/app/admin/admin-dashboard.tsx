@@ -597,7 +597,11 @@ function SettingsPanel({
     });
     const result = await response.json();
     if (!response.ok || !result.ok) {
-      onNotice(result.error || "Webhook setup failed.");
+      onNotice(
+        result.error ||
+          result.result?.description ||
+          "Webhook setup failed.",
+      );
       return;
     }
     onNotice(`Webhook set → ${result.webhookUrl}`);

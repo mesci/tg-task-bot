@@ -64,15 +64,43 @@ export async function POST(request: Request) {
   };
   if (secret) payload.secret_token = secret;
 
-  const response = await fetch(
-    `https://api.telegram.org/bot${token}/setWebhook`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
-    },
-  );
+  try {
+    const response = await fetch(
+      `https://api.telegram.org/bot${token}/setWebhook`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+    );
 
-  const result = await response.json();
-  return Response.json({ ok: response.ok, result, webhookUrl });
+    const result = (await response.json()) as {
+      ok?: boolean;
+      description?: string;
+      error_code?: number;
+    };
+
+    if (!result.ok) {
+      return Response.json(
+        {
+          ok: false,
+          error: result.description || "Telegram rejected the webhook",
+          result,
+          webhookUrl,
+        },
+        { status: 400 },
+      );
+    }
+
+    return Response.json({ ok: true, result, webhookUrl });
+  } catch (error) {
+    return Response.json(
+      {
+        ok: false,
+        error: error instanceof Error ? error.message : "Webhook request failed",
+        webhookUrl,
+      },
+      { status: 500 },
+    );
+  }
 }
