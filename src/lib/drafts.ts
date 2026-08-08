@@ -9,6 +9,7 @@ export type DraftPayload = {
   dueAt?: string | null;
   taskId?: number;
   handoffFrom?: number;
+  promptMessageId?: number;
 };
 
 export async function getDraft(telegramId: string): Promise<Draft | undefined> {

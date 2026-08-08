@@ -1,11 +1,12 @@
 import type { Bot } from "grammy";
 import { isAllowedRoom } from "@/bot/access";
 import { syncBoard } from "@/bot/board";
+import { clearFlow, scrubTrigger, sendFresh } from "@/bot/cleanup";
 import { formatTaskCard } from "@/bot/format";
-import { createPriorityKeyboard, taskKeyboard } from "@/bot/keyboards";
 import { finalizeTaskCreate } from "@/bot/handlers/callbacks";
+import { createPriorityKeyboard, taskKeyboard } from "@/bot/keyboards";
 import { isMenuText } from "@/bot/menu";
-import { clearDraft, getDraft, readPayload, setDraft } from "@/lib/drafts";
+import { getDraft, readPayload, setDraft } from "@/lib/drafts";
 import { getSettings } from "@/lib/settings";
 import { getTask, updateTask } from "@/lib/tasks";
 import { parseDueInput } from "@/lib/time";
@@ -23,7 +24,7 @@ export function registerConversations(bot: Bot) {
     }
 
     const draft = await getDraft(String(ctx.from.id));
-    if (!draft) {
+    if (!draft || draft.step === "idle") {
       await next();
       return;
     }
@@ -35,18 +36,17 @@ export function registerConversations(bot: Bot) {
     const settings = await getSettings();
     const payload = readPayload(draft);
     const text = ctx.message.text.trim();
+    const telegramId = String(ctx.from.id);
+
+    await scrubTrigger(ctx);
 
     if (draft.step === "create_title") {
-      await setDraft({
-        telegramId: String(ctx.from.id),
-        chatId: String(ctx.chat.id),
-        topicId: ctx.message.message_thread_id ?? null,
-        step: "create_description",
-        payload: { title: text },
-      });
-      await ctx.reply(
+      await sendFresh(
+        ctx,
         "📝 Description?\nSend text, or <code>skip</code>.",
         { parse_mode: "HTML" },
+        "create_description",
+        { title: text },
       );
       return;
     }
@@ -54,16 +54,13 @@ export function registerConversations(bot: Bot) {
     if (draft.step === "create_description") {
       const description =
         text.toLowerCase() === "skip" || text === "-" ? null : text;
-      await setDraft({
-        telegramId: String(ctx.from.id),
-        chatId: draft.chatId,
-        topicId: draft.topicId,
-        step: "create_priority",
-        payload: { ...payload, description },
-      });
-      await ctx.reply("⚡ Pick a priority:", {
-        reply_markup: createPriorityKeyboard(),
-      });
+      await sendFresh(
+        ctx,
+        "⚡ Pick a priority:",
+        { reply_markup: createPriorityKeyboard() },
+        "create_priority",
+        { ...payload, description },
+      );
       return;
     }
 
@@ -75,15 +72,18 @@ export function registerConversations(bot: Bot) {
         due === null &&
         text.toLowerCase() !== "none"
       ) {
-        await ctx.reply(
+        await sendFresh(
+          ctx,
           "❓ Couldn't parse that.\nTry <code>YYYY-MM-DD</code> or <code>skip</code>.",
           { parse_mode: "HTML" },
+          "create_due",
+          payload,
         );
         return;
       }
 
       await setDraft({
-        telegramId: String(ctx.from.id),
+        telegramId,
         chatId: draft.chatId,
         topicId: draft.topicId,
         step: "create_due",
@@ -101,12 +101,19 @@ export function registerConversations(bot: Bot) {
         status: "blocked",
         blockedReason: text,
       });
-      await clearDraft(String(ctx.from.id));
+      await clearFlow(ctx.api, telegramId);
       if (updated) {
-        await ctx.reply(formatTaskCard(updated, settings.timezone), {
-          parse_mode: "HTML",
-          reply_markup: taskKeyboard(updated),
-        });
+        await sendFresh(
+          ctx,
+          formatTaskCard(updated, settings.timezone),
+          {
+            parse_mode: "HTML",
+            reply_markup: taskKeyboard(updated),
+          },
+          "idle",
+          {},
+          true,
+        );
       }
       await syncBoard(ctx.api);
       return;
@@ -120,9 +127,12 @@ export function registerConversations(bot: Bot) {
         text.toLowerCase() !== "none" &&
         due === null
       ) {
-        await ctx.reply(
+        await sendFresh(
+          ctx,
           "❓ Couldn't parse that.\nTry <code>YYYY-MM-DD</code> or <code>skip</code>.",
           { parse_mode: "HTML" },
+          "edit_due",
+          payload,
         );
         return;
       }
@@ -131,28 +141,22 @@ export function registerConversations(bot: Bot) {
         dueAt: due,
         reminderSentAt: null,
       });
-      await clearDraft(String(ctx.from.id));
-      if (updated) {
-        await ctx.reply(formatTaskCard(updated, settings.timezone), {
-          parse_mode: "HTML",
-          reply_markup: taskKeyboard(updated),
-        });
-      } else {
-        const task = await getTask(payload.taskId);
-        if (task) {
-          await ctx.reply(formatTaskCard(task, settings.timezone), {
+      await clearFlow(ctx.api, telegramId);
+      const task = updated ?? (await getTask(payload.taskId));
+      if (task) {
+        await sendFresh(
+          ctx,
+          formatTaskCard(task, settings.timezone),
+          {
             parse_mode: "HTML",
             reply_markup: taskKeyboard(task),
-          });
-        }
+          },
+          "idle",
+          {},
+          true,
+        );
       }
       await syncBoard(ctx.api);
-      return;
-    }
-
-    if (draft.step === "focus" || draft.step === "standup") {
-      await clearDraft(String(ctx.from.id));
-      await ctx.reply("❌ That flow was removed.");
       return;
     }
 

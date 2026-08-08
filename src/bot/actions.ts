@@ -1,5 +1,12 @@
-import type { Api, Context } from "grammy";
+import type { Context } from "grammy";
+import { gateAdmin, gateMember } from "@/bot/access";
 import { renderBoardText, syncBoard } from "@/bot/board";
+import {
+  clearFlow,
+  scrubTrigger,
+  sendFresh,
+  wipeStoredPrompt,
+} from "@/bot/cleanup";
 import {
   formatMine,
   formatTaskCard,
@@ -8,41 +15,55 @@ import {
 } from "@/bot/format";
 import {
   boardKeyboard,
-  createPriorityKeyboard,
   helpKeyboard,
   mineKeyboard,
   taskKeyboard,
 } from "@/bot/keyboards";
 import { mainKeyboard } from "@/bot/menu";
-import { setDraft } from "@/lib/drafts";
-import { gateAdmin, gateMember } from "@/bot/access";
 import { listActiveMembers } from "@/lib/members";
 import { getSettings } from "@/lib/settings";
 import { getTask, listTasksForMember } from "@/lib/tasks";
 
 export async function sendHelp(ctx: Context) {
-  await ctx.reply(helpText(), {
-    parse_mode: "HTML",
-    reply_markup: helpKeyboard(),
-  });
-  await ctx.reply("Menu stays under the chat ↓", {
-    reply_markup: mainKeyboard(),
-  });
+  await scrubTrigger(ctx);
+  await sendFresh(
+    ctx,
+    helpText(),
+    {
+      parse_mode: "HTML",
+      reply_markup: mainKeyboard(),
+    },
+    "idle",
+    {},
+    true,
+  );
 }
 
 export async function showBoard(ctx: Context) {
+  await scrubTrigger(ctx);
+
   if (!(await gateMember(ctx)) && !(await gateAdmin(ctx))) {
-    await ctx.reply("🚪 Join the team first.", {
-      reply_markup: mainKeyboard(),
-    });
+    await sendFresh(
+      ctx,
+      "🚪 Join the team first.",
+      { reply_markup: mainKeyboard() },
+      "idle",
+      {},
+      true,
+    );
     return;
   }
 
   const settings = await getSettings();
   if (!settings.chatId) {
-    await ctx.reply("🔗 An admin needs to bind the board room first.", {
-      reply_markup: mainKeyboard(),
-    });
+    await sendFresh(
+      ctx,
+      "🔗 An admin needs to bind the board room first.",
+      { reply_markup: mainKeyboard() },
+      "idle",
+      {},
+      true,
+    );
     return;
   }
 
@@ -50,95 +71,134 @@ export async function showBoard(ctx: Context) {
 
   if (ctx.chat?.type === "private") {
     const text = await renderBoardText();
-    await ctx.reply(text, {
-      parse_mode: "HTML",
-      reply_markup: boardKeyboard(),
-    });
-  } else {
-    await ctx.reply("📌 Board updated.", {
-      reply_markup: mainKeyboard(),
-    });
+    await sendFresh(
+      ctx,
+      text,
+      {
+        parse_mode: "HTML",
+        reply_markup: boardKeyboard(),
+      },
+      "idle",
+      {},
+      true,
+    );
+    return;
+  }
+
+  if (ctx.from) {
+    await wipeStoredPrompt(ctx.api, String(ctx.from.id));
   }
 }
 
 export async function showMine(ctx: Context) {
+  await scrubTrigger(ctx);
+
   const member = await gateMember(ctx);
   if (!member) {
-    await ctx.reply("🚪 You're not on the team yet.", {
-      reply_markup: mainKeyboard(),
-    });
+    await sendFresh(
+      ctx,
+      "🚪 You're not on the team yet.",
+      { reply_markup: mainKeyboard() },
+      "idle",
+      {},
+      true,
+    );
     return;
   }
 
   const settings = await getSettings();
   const tasks = await listTasksForMember(member.id);
-  await ctx.reply(formatMine(member, tasks, settings.timezone), {
-    parse_mode: "HTML",
-    reply_markup: tasks.length > 0 ? mineKeyboard(tasks) : helpKeyboard(),
-  });
+  await sendFresh(
+    ctx,
+    formatMine(member, tasks, settings.timezone),
+    {
+      parse_mode: "HTML",
+      reply_markup: tasks.length > 0 ? mineKeyboard(tasks) : helpKeyboard(),
+    },
+    "idle",
+    {},
+    true,
+  );
 }
 
 export async function showTeam(ctx: Context) {
+  await scrubTrigger(ctx);
   const members = await listActiveMembers();
-  await ctx.reply(teamText(members), {
-    parse_mode: "HTML",
-    reply_markup: mainKeyboard(),
-  });
+  await sendFresh(
+    ctx,
+    teamText(members),
+    {
+      parse_mode: "HTML",
+      reply_markup: mainKeyboard(),
+    },
+    "idle",
+    {},
+    true,
+  );
 }
 
 export async function startCreateTask(ctx: Context) {
+  await scrubTrigger(ctx);
+
   const member = await gateMember(ctx);
   if (!member) {
-    await ctx.reply("🚪 Join the team first.", {
-      reply_markup: mainKeyboard(),
-    });
+    await sendFresh(
+      ctx,
+      "🚪 Join the team first.",
+      { reply_markup: mainKeyboard() },
+      "idle",
+      {},
+      true,
+    );
     return;
   }
 
-  await setDraft({
-    telegramId: String(ctx.from!.id),
-    chatId: String(ctx.chat!.id),
-    topicId:
-      ctx.message?.message_thread_id ??
-      ctx.callbackQuery?.message?.message_thread_id ??
-      null,
-    step: "create_title",
-    payload: {},
-  });
+  if (ctx.from) {
+    await wipeStoredPrompt(ctx.api, String(ctx.from.id));
+  }
 
-  await ctx.reply("🛠 <b>New task</b>\nWhat's the title?", {
-    parse_mode: "HTML",
-  });
+  await sendFresh(
+    ctx,
+    "🛠 <b>New task</b>\nWhat's the title?",
+    { parse_mode: "HTML" },
+    "create_title",
+    {},
+    true,
+  );
 }
 
 export async function openTaskCard(ctx: Context, taskId: number) {
+  await scrubTrigger(ctx);
   const task = await getTask(taskId);
   if (!task) {
-    await ctx.reply("❓ Task not found.");
+    await sendFresh(ctx, "❓ Task not found.", undefined, "idle", {}, true);
     return;
   }
   const settings = await getSettings();
-  await ctx.reply(formatTaskCard(task, settings.timezone), {
-    parse_mode: "HTML",
-    reply_markup: taskKeyboard(task),
-  });
+  await sendFresh(
+    ctx,
+    formatTaskCard(task, settings.timezone),
+    {
+      parse_mode: "HTML",
+      reply_markup: taskKeyboard(task),
+    },
+    "idle",
+    {},
+    true,
+  );
 }
 
-export async function editToTaskCard(
-  ctx: Context,
-  taskId: number,
-) {
-  const task = await getTask(taskId);
-  if (!task) return;
-  const settings = await getSettings();
-  await ctx.editMessageText(formatTaskCard(task, settings.timezone), {
-    parse_mode: "HTML",
-    reply_markup: taskKeyboard(task),
-  });
-}
-
-export async function replyWithPriorityPicker(api: Api, chatId: number | string) {
-  await api.sendMessage(chatId, "⚡ Pick a priority:", {
-    reply_markup: createPriorityKeyboard(),
-  });
+export async function cancelFlow(ctx: Context) {
+  await scrubTrigger(ctx);
+  if (ctx.from) {
+    await clearFlow(ctx.api, String(ctx.from.id));
+  }
+  await sendFresh(
+    ctx,
+    "❌ Cancelled.",
+    { reply_markup: mainKeyboard() },
+    "idle",
+    {},
+    true,
+  );
 }

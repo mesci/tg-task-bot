@@ -15,8 +15,9 @@ import {
   priorityKeyboard,
   taskKeyboard,
 } from "@/bot/keyboards";
+import { clearFlow, deleteQuietly, sendFresh } from "@/bot/cleanup";
 import { notifyAssignee } from "@/bot/handlers/commands";
-import { clearDraft, getDraft, readPayload, setDraft } from "@/lib/drafts";
+import { getDraft, readPayload, setDraft } from "@/lib/drafts";
 import { listActiveMembers } from "@/lib/members";
 import { getSettings } from "@/lib/settings";
 import {
@@ -70,9 +71,15 @@ export function registerCallbacks(bot: Bot) {
     }
 
     if (data === "c:cancel") {
-      await clearDraft(String(ctx.from.id));
       await ctx.answerCallbackQuery({ text: "❌ Cancelled" });
-      await ctx.editMessageText("❌ Cancelled.");
+      if (ctx.chat && ctx.callbackQuery.message) {
+        await deleteQuietly(
+          ctx.api,
+          ctx.chat.id,
+          ctx.callbackQuery.message.message_id,
+        );
+      }
+      await clearFlow(ctx.api, String(ctx.from.id));
       return;
     }
 
@@ -245,17 +252,15 @@ async function handleTaskAction(bot: Bot, ctx: Context, data: string) {
   }
 
   if (action === "blocked") {
-    await setDraft({
-      telegramId: String(ctx.from!.id),
-      chatId: String(ctx.chat?.id ?? ctx.from!.id),
-      topicId: ctx.callbackQuery?.message?.message_thread_id ?? null,
-      step: "block_reason",
-      payload: { taskId },
-    });
     await ctx.answerCallbackQuery();
-    await ctx.reply(`🔴 Why is <b>${taskRef(taskId)}</b> blocked?`, {
-      parse_mode: "HTML",
-    });
+    await sendFresh(
+      ctx,
+      `🔴 Why is <b>${taskRef(taskId)}</b> blocked?`,
+      { parse_mode: "HTML" },
+      "block_reason",
+      { taskId },
+      true,
+    );
     return;
   }
 
@@ -283,17 +288,14 @@ async function handleTaskAction(bot: Bot, ctx: Context, data: string) {
   }
 
   if (action === "due") {
-    await setDraft({
-      telegramId: String(ctx.from!.id),
-      chatId: String(ctx.chat?.id ?? ctx.from!.id),
-      topicId: ctx.callbackQuery?.message?.message_thread_id ?? null,
-      step: "edit_due",
-      payload: { taskId },
-    });
     await ctx.answerCallbackQuery();
-    await ctx.reply(
+    await sendFresh(
+      ctx,
       `📅 New due date for <b>${taskRef(taskId)}</b>?\n<code>YYYY-MM-DD</code>, <code>today</code>, <code>tomorrow</code>, or <code>skip</code>.`,
       { parse_mode: "HTML" },
+      "edit_due",
+      { taskId },
+      true,
     );
     return;
   }
@@ -382,17 +384,24 @@ export async function finalizeTaskCreate(bot: Bot, ctx: Context) {
     dueAt,
   });
 
-  await clearDraft(String(ctx.from!.id));
+  await clearFlow(ctx.api, String(ctx.from!.id));
 
   const card = formatTaskCard(task, settings.timezone);
   try {
     const message = await postToBoard(ctx.api, card, taskKeyboard(task));
     await updateTask(task.id, { messageId: message.message_id });
   } catch {
-    await ctx.reply(card, {
-      parse_mode: "HTML",
-      reply_markup: taskKeyboard(task),
-    });
+    await sendFresh(
+      ctx,
+      card,
+      {
+        parse_mode: "HTML",
+        reply_markup: taskKeyboard(task),
+      },
+      "idle",
+      {},
+      true,
+    );
   }
 
   await syncBoard(ctx.api);
@@ -401,8 +410,5 @@ export async function finalizeTaskCreate(bot: Bot, ctx: Context) {
     task.assigneeId,
     `🛠 Assigned to you: <b>${taskRef(task.id)}</b> ${escapeHtml(task.title)}`,
   );
-  await ctx.reply(`✅ Created <b>${taskRef(task.id)}</b>.`, {
-    parse_mode: "HTML",
-  });
   return true;
 }

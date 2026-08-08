@@ -6,6 +6,7 @@ import {
   isAllowedRoom,
 } from "@/bot/access";
 import {
+  cancelFlow,
   openTaskCard,
   sendHelp,
   showBoard,
@@ -14,9 +15,10 @@ import {
   startCreateTask,
 } from "@/bot/actions";
 import { syncBoard } from "@/bot/board";
+import { scrubTrigger } from "@/bot/cleanup";
+import { sendFresh } from "@/bot/cleanup";
 import { createPriorityKeyboard, taskKeyboard } from "@/bot/keyboards";
 import { mainKeyboard } from "@/bot/menu";
-import { clearDraft, setDraft } from "@/lib/drafts";
 import {
   findMemberById,
   listActiveMembers,
@@ -28,7 +30,6 @@ import { formatTaskCard } from "@/bot/format";
 
 export function registerCommands(bot: Bot) {
   bot.command("start", async (ctx) => {
-    await clearDraft(String(ctx.from!.id));
     await sendHelp(ctx);
   });
 
@@ -44,6 +45,7 @@ export function registerCommands(bot: Bot) {
     const user = ctx.from!;
     const members = await listActiveMembers();
     const existing = await gateMember(ctx);
+    await scrubTrigger(ctx);
 
     if (members.length > 0 && !existing) {
       await ctx.reply(
@@ -141,16 +143,15 @@ export function registerCommands(bot: Bot) {
     }
 
     if (raw.length > 0) {
-      await setDraft({
-        telegramId: String(ctx.from!.id),
-        chatId: String(ctx.chat!.id),
-        topicId: ctx.message?.message_thread_id ?? null,
-        step: "create_priority",
-        payload: { title: raw },
-      });
-      await ctx.reply("⚡ Pick a priority:", {
-        reply_markup: createPriorityKeyboard(),
-      });
+      await scrubTrigger(ctx);
+      await sendFresh(
+        ctx,
+        "⚡ Pick a priority:",
+        { reply_markup: createPriorityKeyboard() },
+        "create_priority",
+        { title: raw },
+        true,
+      );
       return;
     }
 
@@ -158,8 +159,7 @@ export function registerCommands(bot: Bot) {
   });
 
   bot.command("cancel", async (ctx) => {
-    await clearDraft(String(ctx.from!.id));
-    await ctx.reply("❌ Cancelled.", { reply_markup: mainKeyboard() });
+    await cancelFlow(ctx);
   });
 }
 

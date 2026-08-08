@@ -134,11 +134,11 @@ export function formatMine(
 
 export function helpText(): string {
   return [
-    "🎯 <b>taptopia</b>",
-    "TapTopia Team tasks inside Telegram..",
+    "🟨 <b>TAPTOPIA</b>",
+    "Team tasks inside Telegram.",
     "",
-    "Use the menu buttons under the chat,",
-    "or the actions below.",
+    "Use the menu under the chat:",
+    "📌 Board · ➕ New task · 👤 My tasks · 👥 Team",
   ].join("\n");
 }
 
