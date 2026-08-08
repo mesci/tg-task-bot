@@ -1,16 +1,13 @@
 import type { Bot } from "grammy";
-import { gateMember, isAllowedRoom } from "@/bot/access";
+import { isAllowedRoom } from "@/bot/access";
 import { syncBoard } from "@/bot/board";
 import { formatTaskCard } from "@/bot/format";
 import { createPriorityKeyboard, taskKeyboard } from "@/bot/keyboards";
 import { finalizeTaskCreate } from "@/bot/handlers/callbacks";
 import { clearDraft, getDraft, readPayload, setDraft } from "@/lib/drafts";
-import { setFocus } from "@/lib/focus";
-import { mention } from "@/lib/labels";
 import { getSettings } from "@/lib/settings";
 import { getTask, updateTask } from "@/lib/tasks";
 import { parseDueInput } from "@/lib/time";
-import { postToBoard } from "@/bot/board";
 
 export function registerConversations(bot: Bot) {
   bot.on("message:text", async (ctx, next) => {
@@ -41,7 +38,7 @@ export function registerConversations(bot: Bot) {
         step: "create_description",
         payload: { title: text },
       });
-      await ctx.reply("Description? Send text or `skip`.", {
+      await ctx.reply("📝 Description? Send text, or `skip`.", {
         parse_mode: "Markdown",
       });
       return;
@@ -57,7 +54,7 @@ export function registerConversations(bot: Bot) {
         step: "create_priority",
         payload: { ...payload, description },
       });
-      await ctx.reply("Pick a priority.", {
+      await ctx.reply("⚡ Pick a priority:", {
         reply_markup: createPriorityKeyboard(),
       });
       return;
@@ -65,10 +62,16 @@ export function registerConversations(bot: Bot) {
 
     if (draft.step === "create_due") {
       const due = parseDueInput(text, settings.timezone);
-      if (text.toLowerCase() !== "skip" && text !== "-" && due === null && text.toLowerCase() !== "none") {
-        await ctx.reply("Couldn't parse that date. Try `YYYY-MM-DD` or `skip`.", {
-          parse_mode: "Markdown",
-        });
+      if (
+        text.toLowerCase() !== "skip" &&
+        text !== "-" &&
+        due === null &&
+        text.toLowerCase() !== "none"
+      ) {
+        await ctx.reply(
+          "❓ Couldn't parse that. Try `YYYY-MM-DD`, `today`, `tomorrow`, or `skip`.",
+          { parse_mode: "Markdown" },
+        );
         return;
       }
 
@@ -83,38 +86,6 @@ export function registerConversations(bot: Bot) {
         },
       });
       await finalizeTaskCreate(bot, ctx);
-      return;
-    }
-
-    if (draft.step === "focus") {
-      const member = await gateMember(ctx);
-      if (!member) {
-        await clearDraft(String(ctx.from.id));
-        await ctx.reply("You're not on the team yet.");
-        return;
-      }
-      await setFocus({ memberId: member.id, note: text });
-      await clearDraft(String(ctx.from.id));
-      await ctx.reply(`Focus set: *${text}*`, { parse_mode: "Markdown" });
-      return;
-    }
-
-    if (draft.step === "standup") {
-      const member = await gateMember(ctx);
-      if (!member) {
-        await clearDraft(String(ctx.from.id));
-        await ctx.reply("You're not on the team yet.");
-        return;
-      }
-      await setFocus({ memberId: member.id, note: text });
-      await clearDraft(String(ctx.from.id));
-      const line = `*Standup*\n${mention(member)}: ${text}`;
-      try {
-        await postToBoard(ctx.api, line);
-        await ctx.reply("Posted.");
-      } catch {
-        await ctx.reply(line, { parse_mode: "Markdown" });
-      }
       return;
     }
 
@@ -142,9 +113,10 @@ export function registerConversations(bot: Bot) {
         text.toLowerCase() !== "none" &&
         due === null
       ) {
-        await ctx.reply("Couldn't parse that date. Try `YYYY-MM-DD` or `skip`.", {
-          parse_mode: "Markdown",
-        });
+        await ctx.reply(
+          "❓ Couldn't parse that. Try `YYYY-MM-DD`, `today`, `tomorrow`, or `skip`.",
+          { parse_mode: "Markdown" },
+        );
         return;
       }
 
@@ -168,6 +140,12 @@ export function registerConversations(bot: Bot) {
         }
       }
       await syncBoard(ctx.api);
+      return;
+    }
+
+    if (draft.step === "focus" || draft.step === "standup") {
+      await clearDraft(String(ctx.from.id));
+      await ctx.reply("❌ That command was removed. Use /task or /mine.");
       return;
     }
 

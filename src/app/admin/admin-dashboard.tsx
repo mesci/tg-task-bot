@@ -29,7 +29,6 @@ export type Settings = {
   topicId: number | null;
   timezone: string;
   digestEnabled: boolean;
-  standupEnabled: boolean;
   remindersEnabled: boolean;
 };
 
@@ -159,7 +158,6 @@ export function AdminDashboard({ initialData }: { initialData: Overview }) {
             data.settings.topicId,
             data.settings.timezone,
             data.settings.digestEnabled,
-            data.settings.standupEnabled,
             data.settings.remindersEnabled,
           ].join("|")}
           settings={data.settings}
@@ -562,7 +560,6 @@ function SettingsPanel({
   );
   const [timezone, setTimezone] = useState(settings.timezone);
   const [digestEnabled, setDigestEnabled] = useState(settings.digestEnabled);
-  const [standupEnabled, setStandupEnabled] = useState(settings.standupEnabled);
   const [remindersEnabled, setRemindersEnabled] = useState(
     settings.remindersEnabled,
   );
@@ -577,7 +574,6 @@ function SettingsPanel({
         topicId: topicId ? Number(topicId) : null,
         timezone,
         digestEnabled,
-        standupEnabled,
         remindersEnabled,
       }),
     });
@@ -636,14 +632,9 @@ function SettingsPanel({
         />
 
         <Toggle
-          label="Reminders"
+          label="Reminders (DM)"
           checked={remindersEnabled}
           onChange={setRemindersEnabled}
-        />
-        <Toggle
-          label="Morning pulse"
-          checked={standupEnabled}
-          onChange={setStandupEnabled}
         />
         <Toggle
           label="Weekly digest"
@@ -673,7 +664,7 @@ function SettingsPanel({
         <div className="rounded-2xl bg-mist/80 p-4 text-sm text-muted">
           <p>Cron expects Authorization: Bearer CRON_SECRET</p>
           <p className="mt-2">/api/cron/daily · 08:00 UTC</p>
-          <p>Reminders every day · pulse on weekdays · digest on Friday</p>
+          <p>Reminders every day · digest on Friday</p>
         </div>
       </div>
     </section>

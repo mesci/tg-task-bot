@@ -1,15 +1,29 @@
 export const STATUS_LABEL: Record<string, string> = {
-  todo: "Todo",
-  doing: "Doing",
-  blocked: "Blocked",
-  done: "Done",
+  todo: "📋 Todo",
+  doing: "🔵 Doing",
+  blocked: "🔴 Blocked",
+  done: "✅ Done",
+};
+
+export const STATUS_EMOJI: Record<string, string> = {
+  todo: "📋",
+  doing: "🔵",
+  blocked: "🔴",
+  done: "✅",
 };
 
 export const PRIORITY_LABEL: Record<string, string> = {
-  low: "Low",
-  normal: "Normal",
-  high: "High",
-  urgent: "Urgent",
+  low: "⬇️ Low",
+  normal: "➖ Normal",
+  high: "⬆️ High",
+  urgent: "🔥 Urgent",
+};
+
+export const PRIORITY_EMOJI: Record<string, string> = {
+  low: "⬇️",
+  normal: "➖",
+  high: "⬆️",
+  urgent: "🔥",
 };
 
 export const STATUS_ORDER = ["doing", "blocked", "todo", "done"] as const;

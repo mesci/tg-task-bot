@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     const member = await findMemberById(task.assigneeId);
     if (!member) continue;
 
-    const text = `Reminder: ${taskRef(task.id)} *${task.title}* is due ${formatDue(task.dueAt, settings.timezone)}.`;
+    const text = `⏰ Reminder: ${taskRef(task.id)} *${task.title}*\n📅 Due ${formatDue(task.dueAt, settings.timezone)}`;
     try {
       await bot.api.sendMessage(member.telegramId, text, {
         parse_mode: "Markdown",

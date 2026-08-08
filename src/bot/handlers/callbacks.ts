@@ -27,14 +27,17 @@ export function registerCallbacks(bot: Bot) {
 
     if (data === "board:refresh") {
       await syncBoard(ctx.api);
-      await ctx.answerCallbackQuery({ text: "Board refreshed" });
+      await ctx.answerCallbackQuery({ text: "🔄 Board refreshed" });
       return;
     }
 
     if (data === "board:new") {
       const member = await gateMember(ctx);
       if (!member) {
-        await ctx.answerCallbackQuery({ text: "Not on the team", show_alert: true });
+        await ctx.answerCallbackQuery({
+          text: "🚪 Not on the team",
+          show_alert: true,
+        });
         return;
       }
       await setDraft({
@@ -44,14 +47,14 @@ export function registerCallbacks(bot: Bot) {
         step: "create_title",
       });
       await ctx.answerCallbackQuery();
-      await ctx.reply("Task title?");
+      await ctx.reply("🛠 What's the task title?");
       return;
     }
 
     if (data === "c:cancel") {
       await clearDraft(String(ctx.from.id));
-      await ctx.answerCallbackQuery({ text: "Cancelled" });
-      await ctx.editMessageText("Cancelled.");
+      await ctx.answerCallbackQuery({ text: "❌ Cancelled" });
+      await ctx.editMessageText("❌ Cancelled.");
       return;
     }
 
@@ -77,14 +80,20 @@ export function registerCallbacks(bot: Bot) {
 async function handleCreatePriority(ctx: Context, priority: string) {
   const draft = await getDraft(String(ctx.from!.id));
   if (!draft || draft.step !== "create_priority") {
-    await ctx.answerCallbackQuery({ text: "Start with /task", show_alert: true });
+    await ctx.answerCallbackQuery({
+      text: "Start with /task",
+      show_alert: true,
+    });
     return;
   }
 
   const payload = readPayload(draft);
   const valid = ["low", "normal", "high", "urgent"] as const;
   if (!valid.includes(priority as (typeof valid)[number])) {
-    await ctx.answerCallbackQuery({ text: "Invalid priority", show_alert: true });
+    await ctx.answerCallbackQuery({
+      text: "Invalid priority",
+      show_alert: true,
+    });
     return;
   }
 
@@ -101,7 +110,7 @@ async function handleCreatePriority(ctx: Context, priority: string) {
 
   const members = await listActiveMembers();
   await ctx.answerCallbackQuery();
-  await ctx.editMessageText("Who should own this?", {
+  await ctx.editMessageText("👤 Who should own this?", {
     reply_markup: createAssigneeKeyboard(members),
   });
 }
@@ -109,7 +118,10 @@ async function handleCreatePriority(ctx: Context, priority: string) {
 async function handleCreateAssign(ctx: Context, rawId: string) {
   const draft = await getDraft(String(ctx.from!.id));
   if (!draft || draft.step !== "create_assignee") {
-    await ctx.answerCallbackQuery({ text: "Start with /task", show_alert: true });
+    await ctx.answerCallbackQuery({
+      text: "Start with /task",
+      show_alert: true,
+    });
     return;
   }
 
@@ -128,7 +140,7 @@ async function handleCreateAssign(ctx: Context, rawId: string) {
 
   await ctx.answerCallbackQuery();
   await ctx.editMessageText(
-    "Due date? Send `YYYY-MM-DD`, `today`, `tomorrow`, or `skip`.",
+    "📅 Due date?\nSend `YYYY-MM-DD`, `today`, `tomorrow`, or `skip`.",
     { parse_mode: "Markdown" },
   );
 }
@@ -141,7 +153,10 @@ async function handleTaskAction(bot: Bot, ctx: Context, data: string) {
 
   const member = await gateMember(ctx);
   if (!member) {
-    await ctx.answerCallbackQuery({ text: "Not on the team", show_alert: true });
+    await ctx.answerCallbackQuery({
+      text: "🚪 Not on the team",
+      show_alert: true,
+    });
     return;
   }
 
@@ -172,7 +187,7 @@ async function handleTaskAction(bot: Bot, ctx: Context, data: string) {
       assigneeId: member.id,
       status: task.status === "todo" ? "doing" : task.status,
     });
-    await ctx.answerCallbackQuery({ text: "Claimed" });
+    await ctx.answerCallbackQuery({ text: "✋ Claimed" });
     if (updated) {
       await ctx.editMessageText(formatTaskCard(updated, settings.timezone), {
         parse_mode: "Markdown",
@@ -184,11 +199,16 @@ async function handleTaskAction(bot: Bot, ctx: Context, data: string) {
   }
 
   if (action === "todo" || action === "doing" || action === "done") {
+    const labels = {
+      todo: "📋 Todo",
+      doing: "🔵 Doing",
+      done: "✅ Done",
+    } as const;
     const updated = await updateTask(taskId, {
       status: action,
       blockedReason: null,
     });
-    await ctx.answerCallbackQuery({ text: `Marked ${action}` });
+    await ctx.answerCallbackQuery({ text: labels[action] });
     if (updated) {
       await ctx.editMessageText(formatTaskCard(updated, settings.timezone), {
         parse_mode: "Markdown",
@@ -208,7 +228,7 @@ async function handleTaskAction(bot: Bot, ctx: Context, data: string) {
       payload: { taskId },
     });
     await ctx.answerCallbackQuery();
-    await ctx.reply(`Why is ${taskRef(taskId)} blocked?`);
+    await ctx.reply(`🔴 Why is ${taskRef(taskId)} blocked?`);
     return;
   }
 
@@ -224,7 +244,7 @@ async function handleTaskAction(bot: Bot, ctx: Context, data: string) {
     const updated = await updateTask(taskId, {
       priority: arg as "low" | "normal" | "high" | "urgent",
     });
-    await ctx.answerCallbackQuery({ text: "Priority updated" });
+    await ctx.answerCallbackQuery({ text: "⚡ Priority updated" });
     if (updated) {
       await ctx.editMessageText(formatTaskCard(updated, settings.timezone), {
         parse_mode: "Markdown",
@@ -245,7 +265,7 @@ async function handleTaskAction(bot: Bot, ctx: Context, data: string) {
     });
     await ctx.answerCallbackQuery();
     await ctx.reply(
-      `New due date for ${taskRef(taskId)}? \`YYYY-MM-DD\`, \`today\`, \`tomorrow\`, or \`skip\`.`,
+      `📅 New due date for ${taskRef(taskId)}?\n\`YYYY-MM-DD\`, \`today\`, \`tomorrow\`, or \`skip\`.`,
       { parse_mode: "Markdown" },
     );
     return;
@@ -263,7 +283,7 @@ async function handleTaskAction(bot: Bot, ctx: Context, data: string) {
   if (action === "hand" && arg) {
     const assigneeId = Number(arg);
     const updated = await updateTask(taskId, { assigneeId });
-    await ctx.answerCallbackQuery({ text: "Handed off" });
+    await ctx.answerCallbackQuery({ text: "🔁 Handed off" });
     if (updated) {
       await ctx.editMessageText(formatTaskCard(updated, settings.timezone), {
         parse_mode: "Markdown",
@@ -272,7 +292,7 @@ async function handleTaskAction(bot: Bot, ctx: Context, data: string) {
       await notifyAssignee(
         bot,
         assigneeId,
-        `Handed to you: ${taskRef(taskId)} *${task.title}* from ${mention(member)}`,
+        `🔁 Handed to you: ${taskRef(taskId)} *${task.title}*\nfrom ${mention(member)}`,
       );
     }
     await syncBoard(ctx.api);
@@ -284,7 +304,7 @@ async function handleTaskAction(bot: Bot, ctx: Context, data: string) {
     const updated = await updateTask(taskId, {
       assigneeId: assigneeId > 0 ? assigneeId : null,
     });
-    await ctx.answerCallbackQuery({ text: "Assignee updated" });
+    await ctx.answerCallbackQuery({ text: "👤 Assignee updated" });
     if (updated) {
       await ctx.editMessageText(formatTaskCard(updated, settings.timezone), {
         parse_mode: "Markdown",
@@ -305,8 +325,8 @@ async function handleTaskAction(bot: Bot, ctx: Context, data: string) {
 
   if (action === "del") {
     await deleteTask(taskId);
-    await ctx.answerCallbackQuery({ text: "Deleted" });
-    await ctx.editMessageText(`Deleted ${taskRef(taskId)}.`);
+    await ctx.answerCallbackQuery({ text: "🗑 Deleted" });
+    await ctx.editMessageText(`🗑 Deleted ${taskRef(taskId)}.`);
     await syncBoard(ctx.api);
     return;
   }
@@ -350,8 +370,8 @@ export async function finalizeTaskCreate(bot: Bot, ctx: Context) {
   await notifyAssignee(
     bot,
     task.assigneeId,
-    `Assigned: ${taskRef(task.id)} *${task.title}*`,
+    `🛠 Assigned to you: ${taskRef(task.id)} *${task.title}*`,
   );
-  await ctx.reply(`Created ${taskRef(task.id)}.`);
+  await ctx.reply(`✅ Created ${taskRef(task.id)}.`);
   return true;
 }

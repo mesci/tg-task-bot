@@ -5,20 +5,14 @@ import {
   gateMember,
   isAllowedRoom,
 } from "@/bot/access";
-import { postToBoard, renderBoardText, syncBoard } from "@/bot/board";
-import {
-  formatMine,
-  formatTaskCard,
-  formatToday,
-  helpText,
-} from "@/bot/format";
+import { renderBoardText, syncBoard } from "@/bot/board";
+import { formatMine, formatTaskCard, helpText } from "@/bot/format";
 import {
   boardKeyboard,
   createPriorityKeyboard,
   taskKeyboard,
 } from "@/bot/keyboards";
 import { clearDraft, setDraft } from "@/lib/drafts";
-import { getFocusForDay, listFocusesToday, setFocus } from "@/lib/focus";
 import {
   findMemberById,
   listActiveMembers,
@@ -48,7 +42,9 @@ export function registerCommands(bot: Bot) {
     const existing = await gateMember(ctx);
 
     if (members.length > 0 && !existing) {
-      await ctx.reply("Ask a team admin to add you from the admin panel.");
+      await ctx.reply(
+        "🚫 Ask a team admin to add you from the admin panel.",
+      );
       return;
     }
 
@@ -59,14 +55,15 @@ export function registerCommands(bot: Bot) {
       role: existing?.role ?? (members.length === 0 ? "admin" : "member"),
     });
 
-    await ctx.reply(`You're on the taptopia team as *${member.role}*.`, {
-      parse_mode: "Markdown",
-    });
+    await ctx.reply(
+      `✅ You're on the taptopia team as *${member.role}*.`,
+      { parse_mode: "Markdown" },
+    );
   });
 
   bot.command("bind", async (ctx) => {
     if (!ctx.chat || ctx.chat.type === "private") {
-      await ctx.reply("Run /bind inside the team topic.");
+      await ctx.reply("🔗 Run /bind inside the team topic.");
       return;
     }
 
@@ -85,7 +82,9 @@ export function registerCommands(bot: Bot) {
     }
 
     if (!isAdmin) {
-      await ctx.reply("Admins only. Run /join first, or get added from the admin panel.");
+      await ctx.reply(
+        "🚫 Admins only. Run /join first, or get added from the admin panel.",
+      );
       return;
     }
 
@@ -99,23 +98,22 @@ export function registerCommands(bot: Bot) {
     await syncBoard(ctx.api);
     await ctx.reply(
       topicId != null
-        ? `Bound to this topic (\`${topicId}\`).`
-        : "Bound to this chat.",
+        ? `🔗 Bound to this topic (\`${topicId}\`).`
+        : "🔗 Bound to this chat.",
       { parse_mode: "Markdown" },
     );
   });
 
-
   bot.command("board", async (ctx) => {
     if (!(await isAllowedRoom(ctx))) return;
     if (!(await gateMember(ctx)) && !(await gateAdmin(ctx))) {
-      await ctx.reply("Join the team first.");
+      await ctx.reply("🚪 Join the team first with /join.");
       return;
     }
 
     const settings = await getSettings();
     if (!settings.chatId) {
-      await ctx.reply("An admin needs to /bind the board room first.");
+      await ctx.reply("🔗 An admin needs to /bind the board room first.");
       return;
     }
 
@@ -128,7 +126,7 @@ export function registerCommands(bot: Bot) {
         reply_markup: boardKeyboard(),
       });
     } else {
-      await ctx.reply("Board updated.");
+      await ctx.reply("📌 Board updated.");
     }
   });
 
@@ -136,13 +134,14 @@ export function registerCommands(bot: Bot) {
     if (!(await isAllowedRoom(ctx))) return;
     const members = await listActiveMembers();
     if (members.length === 0) {
-      await ctx.reply("No members yet.");
+      await ctx.reply("👥 No members yet.");
       return;
     }
-    const lines = members.map(
-      (member) => `• ${mention(member)} · ${member.role}`,
-    );
-    await ctx.reply(["*Team*", ...lines].join("\n"), {
+    const lines = members.map((member) => {
+      const badge = member.role === "admin" ? "👑" : "👤";
+      return `${badge} ${mention(member)}`;
+    });
+    await ctx.reply(["👥 *Team*", "", ...lines].join("\n"), {
       parse_mode: "Markdown",
     });
   });
@@ -150,7 +149,7 @@ export function registerCommands(bot: Bot) {
   bot.command("mine", async (ctx) => {
     const member = await gateMember(ctx);
     if (!member) {
-      await ctx.reply("You're not on the team yet.");
+      await ctx.reply("🚪 You're not on the team yet.");
       return;
     }
     const settings = await getSettings();
@@ -160,107 +159,12 @@ export function registerCommands(bot: Bot) {
     });
   });
 
-  bot.command("today", async (ctx) => {
-    const member = await gateMember(ctx);
-    if (!member) {
-      await ctx.reply("You're not on the team yet.");
-      return;
-    }
-    const settings = await getSettings();
-    const focus = await getFocusForDay(member.id);
-    const tasks = await listTasksForMember(member.id);
-    await ctx.reply(
-      formatToday({
-        member,
-        focusNote: focus?.note,
-        tasks,
-        timezone: settings.timezone,
-      }),
-      { parse_mode: "Markdown" },
-    );
-  });
-
-  bot.command("focus", async (ctx) => {
-    const member = await gateMember(ctx);
-    if (!member) {
-      await ctx.reply("You're not on the team yet.");
-      return;
-    }
-
-    const note = ctx.match?.toString().trim();
-    if (!note) {
-      await setDraft({
-        telegramId: String(ctx.from!.id),
-        chatId: String(ctx.chat!.id),
-        topicId: ctx.message?.message_thread_id ?? null,
-        step: "focus",
-      });
-      await ctx.reply("What's your focus today?");
-      return;
-    }
-
-    await setFocus({ memberId: member.id, note });
-    await ctx.reply(`Focus set: *${note}*`, { parse_mode: "Markdown" });
-  });
-
-  bot.command("standup", async (ctx) => {
-    const member = await gateMember(ctx);
-    if (!member) {
-      await ctx.reply("You're not on the team yet.");
-      return;
-    }
-
-    const note = ctx.match?.toString().trim();
-    if (!note) {
-      await setDraft({
-        telegramId: String(ctx.from!.id),
-        chatId: String(ctx.chat!.id),
-        topicId: ctx.message?.message_thread_id ?? null,
-        step: "standup",
-      });
-      await ctx.reply("One line: what are you driving today?");
-      return;
-    }
-
-    await setFocus({ memberId: member.id, note });
-    const text = `*Standup*\n${mention(member)}: ${note}`;
-    try {
-      await postToBoard(ctx.api, text);
-      await ctx.reply("Posted.");
-    } catch {
-      await ctx.reply(text, { parse_mode: "Markdown" });
-    }
-  });
-
-  bot.command("pulse", async (ctx) => {
-    if (!(await isAllowedRoom(ctx))) return;
-    const settings = await getSettings();
-    const focuses = await listFocusesToday();
-    const members = await listActiveMembers();
-    const map = new Map(focuses.map((row) => [row.memberId, row.note]));
-
-    const lines = ["*Team pulse*", ""];
-    for (const member of members) {
-      const note = map.get(member.id);
-      lines.push(
-        `• ${mention(member)} — ${note ? note : "_no focus yet_"}`,
-      );
-    }
-
-    if (members.length === 0) {
-      lines.push("_No members._");
-    }
-
-    lines.push("", `_Timezone ${settings.timezone}_`);
-    await ctx.reply(lines.join("\n"), { parse_mode: "Markdown" });
-  });
-
   bot.command("task", async (ctx) => {
     if (!(await isAllowedRoom(ctx)) && ctx.chat?.type !== "private") return;
 
     const member = await gateMember(ctx);
     if (!member) {
-      await ctx.reply("You're not on the team yet. Use /join or ask an admin.");
+      await ctx.reply("🚪 Join the team first with /join, or ask an admin.");
       return;
     }
 
@@ -268,7 +172,7 @@ export function registerCommands(bot: Bot) {
     if (/^\d+$/.test(raw)) {
       const task = await getTask(Number(raw));
       if (!task) {
-        await ctx.reply("Task not found.");
+        await ctx.reply("❓ Task not found.");
         return;
       }
       const settings = await getSettings();
@@ -287,7 +191,7 @@ export function registerCommands(bot: Bot) {
         step: "create_priority",
         payload: { title: raw },
       });
-      await ctx.reply("Pick a priority.", {
+      await ctx.reply("⚡ Pick a priority:", {
         reply_markup: createPriorityKeyboard(),
       });
       return;
@@ -300,12 +204,12 @@ export function registerCommands(bot: Bot) {
       step: "create_title",
       payload: {},
     });
-    await ctx.reply("Task title?");
+    await ctx.reply("🛠 What's the task title?");
   });
 
   bot.command("cancel", async (ctx) => {
     await clearDraft(String(ctx.from!.id));
-    await ctx.reply("Cancelled.");
+    await ctx.reply("❌ Cancelled.");
   });
 }
 

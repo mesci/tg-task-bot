@@ -28,7 +28,6 @@ export default async function AdminPage() {
       topicId: settings.topicId,
       timezone: settings.timezone,
       digestEnabled: settings.digestEnabled,
-      standupEnabled: settings.standupEnabled,
       remindersEnabled: settings.remindersEnabled,
     },
     members: members.map((member) => ({

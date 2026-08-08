@@ -27,24 +27,26 @@ export async function GET(request: Request) {
   const doing = open.filter((task) => task.status === "doing");
 
   const lines = [
-    "*Weekly digest*",
+    "📊 *Weekly digest*",
     "",
-    `*Done this week* · ${completed.length}`,
-    ...completed.slice(0, 12).map((task) => `• ${taskRef(task.id)} ${task.title}`),
+    `✅ *Done this week* · ${completed.length}`,
+    ...completed
+      .slice(0, 12)
+      .map((task) => `• ${taskRef(task.id)} ${task.title}`),
     "",
-    `*In motion* · ${doing.length}`,
+    `🔵 *In motion* · ${doing.length}`,
     ...doing.slice(0, 10).map(
       (task) =>
         `• ${taskRef(task.id)} ${task.title}${task.assignee ? ` — ${mention(task.assignee)}` : ""}`,
     ),
     "",
-    `*Blocked* · ${blocked.length}`,
+    `🔴 *Blocked* · ${blocked.length}`,
     ...blocked.slice(0, 10).map(
       (task) =>
         `• ${taskRef(task.id)} ${task.title}${task.blockedReason ? ` — ${task.blockedReason}` : ""}`,
     ),
     "",
-    `Open total: ${open.length}`,
+    `📌 Open total: ${open.length}`,
   ];
 
   const bot = getBot();
