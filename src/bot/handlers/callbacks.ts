@@ -214,6 +214,12 @@ async function handleTaskAction(bot: Bot, ctx: Context, data: string) {
     return;
   }
 
+  if (action === "tasks") {
+    await ctx.answerCallbackQuery({ text: "📋 Tasks" });
+    await showMine(ctx);
+    return;
+  }
+
   if (action === "claim") {
     const updated = await updateTask(taskId, {
       assigneeId: member.id,

@@ -10,8 +10,12 @@ export function taskKeyboard(task: Task): InlineKeyboard {
       kb.text("✋ Claim", `t:${task.id}:claim`).primary().row();
     }
 
-    kb.text("📋 ", `t:${task.id}:todo`)
-      .text("🔵 Doing", `t:${task.id}:doing`)
+    kb.text("📋 Tasks", `t:${task.id}:tasks`).primary().row();
+
+    if (task.status !== "todo") {
+      kb.text("📋 Todo", `t:${task.id}:todo`);
+    }
+    kb.text("🔵 Doing", `t:${task.id}:doing`)
       .primary()
       .row();
     kb.text("🔴 Blocked", `t:${task.id}:blocked`)
@@ -24,6 +28,7 @@ export function taskKeyboard(task: Task): InlineKeyboard {
       .text("📅 Due", `t:${task.id}:due`)
       .row();
   } else {
+    kb.text("📋 Tasks", `t:${task.id}:tasks`).row();
     kb.text("↩️ Reopen", `t:${task.id}:todo`).primary().row();
   }
 
