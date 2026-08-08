@@ -153,10 +153,6 @@ export async function startCreateTask(ctx: Context) {
     return;
   }
 
-  if (ctx.from) {
-    await wipeStoredPrompt(ctx.api, String(ctx.from.id));
-  }
-
   await sendFresh(
     ctx,
     "🛠 <b>New task</b>\nWhat's the title?",

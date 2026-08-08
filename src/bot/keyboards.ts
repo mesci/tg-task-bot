@@ -106,7 +106,9 @@ export function boardKeyboard(): InlineKeyboard {
     .text("🔄 Refresh", "board:refresh")
     .primary()
     .text("➕ New task", "board:new")
-    .success();
+    .success()
+    .row()
+    .text("👤 My tasks", "board:mine");
 }
 
 export function helpKeyboard(): InlineKeyboard {

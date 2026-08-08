@@ -17,28 +17,35 @@ export function registerMenu(bot: Bot) {
       return;
     }
 
-    if (!(await isAllowedRoom(ctx)) && ctx.chat.type !== "private") {
-      return;
-    }
+    try {
+      if (!(await isAllowedRoom(ctx))) {
+        await ctx.reply("🔗 Use this in the bound board topic, or in DM.");
+        return;
+      }
 
-    if (text === MENU.board) {
-      await showBoard(ctx);
-      return;
-    }
-    if (text === MENU.task) {
-      await startCreateTask(ctx);
-      return;
-    }
-    if (text === MENU.mine) {
-      await showMine(ctx);
-      return;
-    }
-    if (text === MENU.team) {
-      await showTeam(ctx);
-      return;
-    }
-    if (text === MENU.help) {
-      await sendHelp(ctx);
+      if (text === MENU.board) {
+        await showBoard(ctx);
+        return;
+      }
+      if (text === MENU.task) {
+        await startCreateTask(ctx);
+        return;
+      }
+      if (text === MENU.mine) {
+        await showMine(ctx);
+        return;
+      }
+      if (text === MENU.team) {
+        await showTeam(ctx);
+        return;
+      }
+      if (text === MENU.help) {
+        await sendHelp(ctx);
+        return;
+      }
+    } catch (error) {
+      console.error("Menu error", error);
+      await ctx.reply("Something went wrong. Try again.");
       return;
     }
 

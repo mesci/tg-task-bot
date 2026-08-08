@@ -1,5 +1,5 @@
 import type { Bot, Context } from "grammy";
-import { gateMember, isAllowedRoom } from "@/bot/access";
+import { gateMember } from "@/bot/access";
 import {
   showBoard,
   showMine,
@@ -30,75 +30,85 @@ import { escapeHtml, mention, taskRef } from "@/lib/labels";
 
 export function registerCallbacks(bot: Bot) {
   bot.on("callback_query:data", async (ctx) => {
-    const data = ctx.callbackQuery.data;
+    try {
+      const data = ctx.callbackQuery.data;
 
-    if (data === "board:refresh") {
-      await syncBoard(ctx.api);
-      await ctx.answerCallbackQuery({ text: "🔄 Refreshed" });
-      return;
-    }
-
-    if (data === "board:new" || data === "menu:task") {
-      const member = await gateMember(ctx);
-      if (!member) {
-        await ctx.answerCallbackQuery({
-          text: "🚪 Not on the team",
-          show_alert: true,
-        });
+      if (data === "board:refresh") {
+        await syncBoard(ctx.api);
+        await ctx.answerCallbackQuery({ text: "🔄 Refreshed" });
         return;
       }
-      await ctx.answerCallbackQuery();
-      await startCreateTask(ctx);
-      return;
-    }
 
-    if (data === "menu:board") {
-      await ctx.answerCallbackQuery();
-      await showBoard(ctx);
-      return;
-    }
-
-    if (data === "menu:mine") {
-      await ctx.answerCallbackQuery();
-      await showMine(ctx);
-      return;
-    }
-
-    if (data === "menu:team") {
-      await ctx.answerCallbackQuery();
-      await showTeam(ctx);
-      return;
-    }
-
-    if (data === "c:cancel") {
-      await ctx.answerCallbackQuery({ text: "❌ Cancelled" });
-      if (ctx.chat && ctx.callbackQuery.message) {
-        await deleteQuietly(
-          ctx.api,
-          ctx.chat.id,
-          ctx.callbackQuery.message.message_id,
-        );
+      if (data === "board:new" || data === "menu:task") {
+        const member = await gateMember(ctx);
+        if (!member) {
+          await ctx.answerCallbackQuery({
+            text: "🚪 Not on the team",
+            show_alert: true,
+          });
+          return;
+        }
+        await ctx.answerCallbackQuery();
+        await startCreateTask(ctx);
+        return;
       }
-      await clearFlow(ctx.api, String(ctx.from.id));
-      return;
-    }
 
-    if (data.startsWith("c:prio:")) {
-      await handleCreatePriority(ctx, data.slice("c:prio:".length));
-      return;
-    }
+      if (data === "board:mine" || data === "menu:mine") {
+        await ctx.answerCallbackQuery();
+        await showMine(ctx);
+        return;
+      }
 
-    if (data.startsWith("c:assign:")) {
-      await handleCreateAssign(ctx, data.slice("c:assign:".length));
-      return;
-    }
+      if (data === "menu:board") {
+        await ctx.answerCallbackQuery();
+        await showBoard(ctx);
+        return;
+      }
 
-    if (data.startsWith("t:")) {
-      await handleTaskAction(bot, ctx, data);
-      return;
-    }
+      if (data === "menu:team") {
+        await ctx.answerCallbackQuery();
+        await showTeam(ctx);
+        return;
+      }
 
-    await ctx.answerCallbackQuery();
+      if (data === "c:cancel") {
+        await ctx.answerCallbackQuery({ text: "❌ Cancelled" });
+        if (ctx.chat && ctx.callbackQuery.message) {
+          await deleteQuietly(
+            ctx.api,
+            ctx.chat.id,
+            ctx.callbackQuery.message.message_id,
+          );
+        }
+        await clearFlow(ctx.api, String(ctx.from.id));
+        return;
+      }
+
+      if (data.startsWith("c:prio:")) {
+        await handleCreatePriority(ctx, data.slice("c:prio:".length));
+        return;
+      }
+
+      if (data.startsWith("c:assign:")) {
+        await handleCreateAssign(ctx, data.slice("c:assign:".length));
+        return;
+      }
+
+      if (data.startsWith("t:")) {
+        await handleTaskAction(bot, ctx, data);
+        return;
+      }
+
+      await ctx.answerCallbackQuery();
+    } catch (error) {
+      console.error("Callback error", error);
+      try {
+        await ctx.answerCallbackQuery({
+          text: "Something went wrong. Try again.",
+          show_alert: true,
+        });
+      } catch {}
+    }
   });
 }
 
@@ -171,11 +181,6 @@ async function handleCreateAssign(ctx: Context, rawId: string) {
 }
 
 async function handleTaskAction(bot: Bot, ctx: Context, data: string) {
-  if (!(await isAllowedRoom(ctx)) && ctx.chat?.type !== "private") {
-    await ctx.answerCallbackQuery({ text: "Wrong room", show_alert: true });
-    return;
-  }
-
   const member = await gateMember(ctx);
   if (!member) {
     await ctx.answerCallbackQuery({
@@ -201,10 +206,17 @@ async function handleTaskAction(bot: Bot, ctx: Context, data: string) {
   if (action === "open" || action === "show") {
     await ctx.answerCallbackQuery();
     if (action === "show") {
-      await ctx.reply(formatTaskCard(task, settings.timezone), {
-        parse_mode: "HTML",
-        reply_markup: taskKeyboard(task),
-      });
+      await sendFresh(
+        ctx,
+        formatTaskCard(task, settings.timezone),
+        {
+          parse_mode: "HTML",
+          reply_markup: taskKeyboard(task),
+        },
+        "idle",
+        {},
+        true,
+      );
       return;
     }
     await ctx.editMessageText(formatTaskCard(task, settings.timezone), {

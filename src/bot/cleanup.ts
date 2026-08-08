@@ -1,4 +1,5 @@
 import type { Api, Context } from "grammy";
+import { threadIdFromCtx, threadOptions } from "@/bot/access";
 import {
   clearDraft,
   getDraft,
@@ -24,11 +25,18 @@ export async function scrubTrigger(ctx: Context) {
   await deleteQuietly(ctx.api, ctx.chat.id, msg.message_id);
 }
 
-export async function wipeStoredPrompt(api: Api, telegramId: string) {
+export async function wipeStoredPrompt(
+  api: Api,
+  telegramId: string,
+  exceptMessageId?: number | null,
+) {
   const draft = await getDraft(telegramId);
   if (!draft) return;
   const payload = readPayload(draft);
-  if (payload.promptMessageId) {
+  if (
+    payload.promptMessageId != null &&
+    payload.promptMessageId !== exceptMessageId
+  ) {
     await deleteQuietly(api, draft.chatId, payload.promptMessageId);
   }
 }
@@ -42,23 +50,33 @@ export async function sendFresh(
   replacePayload = false,
 ) {
   const telegramId = String(ctx.from!.id);
+  const chat = ctx.chat;
+  if (!chat) {
+    throw new Error("No chat in context");
+  }
+
   const draft = await getDraft(telegramId);
   const prev = draft ? readPayload(draft) : {};
 
-  if (prev.promptMessageId && draft) {
-    await deleteQuietly(ctx.api, draft.chatId, prev.promptMessageId);
-  }
+  const extraObj =
+    extra && typeof extra === "object" ? (extra as Record<string, unknown>) : {};
 
-  const message = await ctx.reply(text, extra);
+  const message = await ctx.reply(text, {
+    ...extraObj,
+    ...threadOptions(ctx),
+  } as Parameters<Context["reply"]>[1]);
+
+  if (
+    prev.promptMessageId != null &&
+    prev.promptMessageId !== message.message_id
+  ) {
+    await deleteQuietly(ctx.api, draft!.chatId, prev.promptMessageId);
+  }
 
   await setDraft({
     telegramId,
-    chatId: String(ctx.chat!.id),
-    topicId:
-      ctx.message?.message_thread_id ??
-      ctx.callbackQuery?.message?.message_thread_id ??
-      draft?.topicId ??
-      null,
+    chatId: String(chat.id),
+    topicId: threadIdFromCtx(ctx) ?? draft?.topicId ?? null,
     step,
     payload: {
       ...(replacePayload ? {} : prev),
