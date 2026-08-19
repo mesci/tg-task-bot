@@ -69,6 +69,10 @@ export async function showBoard(ctx: Context) {
   await recreateBoard(ctx.api);
 
   if (ctx.chat?.type === "private") {
+    await ctx.reply(await renderDoneBoardText(), {
+      parse_mode: "HTML",
+      reply_markup: boardKeyboard(),
+    });
     const openText = await renderOpenBoardText();
     await sendFresh(
       ctx,
@@ -81,9 +85,6 @@ export async function showBoard(ctx: Context) {
       {},
       true,
     );
-    await ctx.reply(await renderDoneBoardText(), {
-      parse_mode: "HTML",
-    });
     return;
   }
 

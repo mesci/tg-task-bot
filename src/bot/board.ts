@@ -49,8 +49,17 @@ export async function syncBoard(api: Api): Promise<void> {
   const thread =
     settings.topicId != null ? { message_thread_id: settings.topicId } : {};
 
-  const openText = await renderOpenBoardText();
   const doneText = await renderDoneBoardText();
+  const openText = await renderOpenBoardText();
+
+  const doneBoardMessageId = await upsertBoardMessage(
+    api,
+    settings.chatId,
+    settings.doneBoardMessageId,
+    doneText,
+    thread,
+    boardKeyboard(),
+  );
 
   const boardMessageId = await upsertBoardMessage(
     api,
@@ -61,14 +70,6 @@ export async function syncBoard(api: Api): Promise<void> {
     boardKeyboard(),
   );
 
-  const doneBoardMessageId = await upsertBoardMessage(
-    api,
-    settings.chatId,
-    settings.doneBoardMessageId,
-    doneText,
-    thread,
-  );
-
   await updateSettings({ boardMessageId, doneBoardMessageId });
 }
 
@@ -76,15 +77,15 @@ export async function recreateBoard(api: Api): Promise<void> {
   const settings = await getSettings();
   if (!settings.chatId) return;
 
-  if (settings.boardMessageId) {
-    try {
-      await api.deleteMessage(settings.chatId, settings.boardMessageId);
-    } catch {}
-  }
-
   if (settings.doneBoardMessageId) {
     try {
       await api.deleteMessage(settings.chatId, settings.doneBoardMessageId);
+    } catch {}
+  }
+
+  if (settings.boardMessageId) {
+    try {
+      await api.deleteMessage(settings.chatId, settings.boardMessageId);
     } catch {}
   }
 
