@@ -2,12 +2,12 @@ import type { Api, InlineKeyboard } from "grammy";
 import { formatBoard } from "@/bot/format";
 import { boardKeyboard } from "@/bot/keyboards";
 import { getSettings, updateSettings } from "@/lib/settings";
-import { listOpenTasks, listRecentDone } from "@/lib/tasks";
+import { listOpenTasks, listAllDone } from "@/lib/tasks";
 
 export async function renderBoardText() {
   const settings = await getSettings();
   const open = await listOpenTasks();
-  const done = await listRecentDone(6);
+  const done = await listAllDone();
   return formatBoard({ open, done, timezone: settings.timezone });
 }
 

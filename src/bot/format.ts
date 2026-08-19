@@ -52,7 +52,7 @@ export function formatBoard(input: {
     if (bucket.length === 0) continue;
     hasContent = true;
     lines.push(`${STATUS_LABEL[status]} <b>· ${bucket.length}</b>`);
-    for (const task of bucket.slice(0, status === "done" ? 5 : 15)) {
+    for (const task of bucket) {
       lines.push(formatTaskLine(task, input.timezone));
       lines.push("");
     }

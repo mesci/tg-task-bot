@@ -13,7 +13,7 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "taptopia",
+  title: "TAPTOPIA",
   description: "Team coordination for taptopia",
 };
 

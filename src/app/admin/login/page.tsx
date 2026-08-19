@@ -37,7 +37,7 @@ export default function AdminLoginPage() {
       <div className="relative overflow-hidden rounded-[28px] border border-line bg-panel p-8 shadow-[0_30px_80px_rgba(18,22,15,0.08)] backdrop-blur">
         <div className="mb-8">
           <p className="font-[family-name:var(--font-display)] text-4xl tracking-tight text-ink">
-            taptopia
+            TAPTOPIA
           </p>
           <p className="mt-3 max-w-sm text-muted">
             Private admin access for the taptopia board.

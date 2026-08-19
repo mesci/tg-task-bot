@@ -46,6 +46,16 @@ export async function listRecentDone(limit = 8): Promise<TaskWithAssignee[]> {
   return attachAssignees(rows);
 }
 
+export async function listAllDone(): Promise<TaskWithAssignee[]> {
+  const db = getDb();
+  const rows = await db
+    .select()
+    .from(schema.tasks)
+    .where(eq(schema.tasks.status, "done"))
+    .orderBy(desc(schema.tasks.completedAt));
+  return attachAssignees(rows);
+}
+
 export async function listAllTasks(): Promise<TaskWithAssignee[]> {
   const db = getDb();
   const rows = await db

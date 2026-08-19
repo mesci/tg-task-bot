@@ -78,7 +78,7 @@ export function AdminDashboard({ initialData }: { initialData: Overview }) {
       <header className="mb-10 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="font-[family-name:var(--font-display)] text-5xl tracking-tight md:text-6xl">
-            taptopia
+            TAPTOPIA
           </p>
           <p className="mt-2 max-w-xl text-muted">
             Members, tasks, and board settings.
