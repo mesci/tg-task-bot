@@ -76,6 +76,7 @@ export async function ensureSchema(): Promise<void> {
         chat_id TEXT,
         topic_id INTEGER,
         board_message_id INTEGER,
+        done_board_message_id INTEGER,
         timezone TEXT NOT NULL DEFAULT 'UTC',
         digest_enabled INTEGER NOT NULL DEFAULT 1,
         standup_enabled INTEGER NOT NULL DEFAULT 1,
@@ -100,6 +101,12 @@ export async function ensureSchema(): Promise<void> {
     ],
     "write",
   );
+
+  try {
+    await client.execute(
+      "ALTER TABLE settings ADD COLUMN done_board_message_id INTEGER",
+    );
+  } catch {}
 }
 
 export { schema };

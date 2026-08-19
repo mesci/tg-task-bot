@@ -3,7 +3,7 @@ import {
   PRIORITY_LABEL,
   STATUS_EMOJI,
   STATUS_LABEL,
-  STATUS_ORDER,
+  OPEN_STATUS_ORDER,
   escapeHtml,
   mention,
   taskRef,
@@ -30,9 +30,8 @@ export function formatTaskLine(
   return `${STATUS_EMOJI[task.status]} <b>${taskRef(task.id)}</b> ${prio}${escapeHtml(task.title)}\n      👤 ${who}${due}${blocked}`;
 }
 
-export function formatBoard(input: {
+export function formatOpenBoard(input: {
   open: TaskWithAssignee[];
-  done: TaskWithAssignee[];
   timezone: string;
 }): string {
   const openCount = input.open.length;
@@ -44,11 +43,8 @@ export function formatBoard(input: {
 
   let hasContent = false;
 
-  for (const status of STATUS_ORDER) {
-    const bucket =
-      status === "done"
-        ? input.done
-        : input.open.filter((task) => task.status === status);
+  for (const status of OPEN_STATUS_ORDER) {
+    const bucket = input.open.filter((task) => task.status === status);
     if (bucket.length === 0) continue;
     hasContent = true;
     lines.push(`${STATUS_LABEL[status]} <b>· ${bucket.length}</b>`);
@@ -61,6 +57,29 @@ export function formatBoard(input: {
   if (!hasContent) {
     lines.push("✨ <i>Board is clear.</i>");
     lines.push("<i>Tap ➕ New task to start.</i>");
+  }
+
+  return lines.join("\n").trim();
+}
+
+export function formatDoneBoard(input: {
+  done: TaskWithAssignee[];
+  timezone: string;
+}): string {
+  const lines: string[] = [
+    "✅ <b>TAPTOPIA DONE</b>",
+    `<i>${input.done.length} completed</i>`,
+    "",
+  ];
+
+  if (input.done.length === 0) {
+    lines.push("<i>No completed tasks yet.</i>");
+    return lines.join("\n").trim();
+  }
+
+  for (const task of input.done) {
+    lines.push(formatTaskLine(task, input.timezone));
+    lines.push("");
   }
 
   return lines.join("\n").trim();

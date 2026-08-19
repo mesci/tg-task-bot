@@ -27,6 +27,7 @@ export const PRIORITY_EMOJI: Record<string, string> = {
 };
 
 export const STATUS_ORDER = ["doing", "blocked", "todo", "done"] as const;
+export const OPEN_STATUS_ORDER = ["doing", "blocked", "todo"] as const;
 
 export function escapeHtml(value: string): string {
   return value

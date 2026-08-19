@@ -100,6 +100,7 @@ export function registerCommands(bot: Bot) {
       chatId: String(ctx.chat.id),
       topicId,
       boardMessageId: null,
+      doneBoardMessageId: null,
     });
 
     await syncBoard(ctx.api);

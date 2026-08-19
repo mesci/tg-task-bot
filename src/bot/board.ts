@@ -1,46 +1,75 @@
 import type { Api, InlineKeyboard } from "grammy";
-import { formatBoard } from "@/bot/format";
+import { formatDoneBoard, formatOpenBoard } from "@/bot/format";
 import { boardKeyboard } from "@/bot/keyboards";
 import { getSettings, updateSettings } from "@/lib/settings";
-import { listOpenTasks, listAllDone } from "@/lib/tasks";
+import { listAllDone, listOpenTasks } from "@/lib/tasks";
 
-export async function renderBoardText() {
+export async function renderOpenBoardText() {
   const settings = await getSettings();
   const open = await listOpenTasks();
+  return formatOpenBoard({ open, timezone: settings.timezone });
+}
+
+export async function renderDoneBoardText() {
+  const settings = await getSettings();
   const done = await listAllDone();
-  return formatBoard({ open, done, timezone: settings.timezone });
+  return formatDoneBoard({ done, timezone: settings.timezone });
+}
+
+async function upsertBoardMessage(
+  api: Api,
+  chatId: string,
+  messageId: number | null | undefined,
+  text: string,
+  thread: { message_thread_id?: number },
+  replyMarkup?: InlineKeyboard,
+): Promise<number> {
+  if (messageId) {
+    try {
+      await api.editMessageText(chatId, messageId, text, {
+        parse_mode: "HTML",
+        reply_markup: replyMarkup,
+      });
+      return messageId;
+    } catch {}
+  }
+
+  const message = await api.sendMessage(chatId, text, {
+    parse_mode: "HTML",
+    reply_markup: replyMarkup,
+    ...thread,
+  });
+  return message.message_id;
 }
 
 export async function syncBoard(api: Api): Promise<void> {
   const settings = await getSettings();
   if (!settings.chatId) return;
 
-  const text = await renderBoardText();
   const thread =
     settings.topicId != null ? { message_thread_id: settings.topicId } : {};
 
-  if (settings.boardMessageId) {
-    try {
-      await api.editMessageText(
-        settings.chatId,
-        settings.boardMessageId,
-        text,
-        {
-          parse_mode: "HTML",
-          reply_markup: boardKeyboard(),
-        },
-      );
-      return;
-    } catch {}
-  }
+  const openText = await renderOpenBoardText();
+  const doneText = await renderDoneBoardText();
 
-  const message = await api.sendMessage(settings.chatId, text, {
-    parse_mode: "HTML",
-    reply_markup: boardKeyboard(),
-    ...thread,
-  });
+  const boardMessageId = await upsertBoardMessage(
+    api,
+    settings.chatId,
+    settings.boardMessageId,
+    openText,
+    thread,
+    boardKeyboard(),
+  );
 
-  await updateSettings({ boardMessageId: message.message_id });
+  const doneBoardMessageId = await upsertBoardMessage(
+    api,
+    settings.chatId,
+    settings.doneBoardMessageId,
+    doneText,
+    thread,
+  );
+
+  await updateSettings({ boardMessageId, doneBoardMessageId });
 }
 
 export async function recreateBoard(api: Api): Promise<void> {
@@ -51,9 +80,15 @@ export async function recreateBoard(api: Api): Promise<void> {
     try {
       await api.deleteMessage(settings.chatId, settings.boardMessageId);
     } catch {}
-    await updateSettings({ boardMessageId: null });
   }
 
+  if (settings.doneBoardMessageId) {
+    try {
+      await api.deleteMessage(settings.chatId, settings.doneBoardMessageId);
+    } catch {}
+  }
+
+  await updateSettings({ boardMessageId: null, doneBoardMessageId: null });
   await syncBoard(api);
 }
 

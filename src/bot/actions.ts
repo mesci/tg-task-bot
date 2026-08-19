@@ -1,6 +1,6 @@
 import type { Context } from "grammy";
 import { gateAdmin, gateMember } from "@/bot/access";
-import { recreateBoard, renderBoardText } from "@/bot/board";
+import { recreateBoard, renderDoneBoardText, renderOpenBoardText } from "@/bot/board";
 import {
   clearFlow,
   scrubTrigger,
@@ -69,10 +69,10 @@ export async function showBoard(ctx: Context) {
   await recreateBoard(ctx.api);
 
   if (ctx.chat?.type === "private") {
-    const text = await renderBoardText();
+    const openText = await renderOpenBoardText();
     await sendFresh(
       ctx,
-      text,
+      openText,
       {
         parse_mode: "HTML",
         reply_markup: boardKeyboard(),
@@ -81,6 +81,9 @@ export async function showBoard(ctx: Context) {
       {},
       true,
     );
+    await ctx.reply(await renderDoneBoardText(), {
+      parse_mode: "HTML",
+    });
     return;
   }
 

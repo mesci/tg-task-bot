@@ -18,6 +18,7 @@ export async function updateSettings(
     chatId: string | null;
     topicId: number | null;
     boardMessageId: number | null;
+    doneBoardMessageId: number | null;
     timezone: string;
     digestEnabled: boolean;
     standupEnabled: boolean;
