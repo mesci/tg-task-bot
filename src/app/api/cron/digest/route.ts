@@ -9,6 +9,8 @@ import { listCompletedSince, listOpenTasks } from "@/lib/tasks";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const DIGEST_MIN_DONE = 10;
+
 export async function GET(request: Request) {
   if (!verifyCronRequest(request.headers.get("authorization"))) {
     return new Response("Unauthorized", { status: 401 });
@@ -22,6 +24,17 @@ export async function GET(request: Request) {
 
   const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const completed = await listCompletedSince(since);
+
+  if (completed.length < DIGEST_MIN_DONE) {
+    return Response.json({
+      ok: true,
+      skipped: true,
+      reason: "below_threshold",
+      completed: completed.length,
+      threshold: DIGEST_MIN_DONE,
+    });
+  }
+
   const open = await listOpenTasks();
   const blocked = open.filter((task) => task.status === "blocked");
   const doing = open.filter((task) => task.status === "doing");
