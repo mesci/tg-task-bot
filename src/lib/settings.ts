@@ -1,6 +1,14 @@
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 
+export const CLEAR_DONE_KEEP_DAYS = 2;
+
+export function clearDoneCutoff(from = new Date()): Date {
+  return new Date(
+    from.getTime() - CLEAR_DONE_KEEP_DAYS * 24 * 60 * 60 * 1000,
+  );
+}
+
 export async function getSettings() {
   const db = getDb();
   const rows = await db.select().from(schema.settings).limit(1);

@@ -20,7 +20,8 @@ import { clearFlow, deleteQuietly, sendFresh } from "@/bot/cleanup";
 import { notifyAssignee } from "@/bot/handlers/commands";
 import { getDraft, readPayload, setDraft } from "@/lib/drafts";
 import { listActiveMembers } from "@/lib/members";
-import { getSettings, updateSettings } from "@/lib/settings";
+import { clearDoneCutoff, getSettings, updateSettings } from "@/lib/settings";
+import { CLEAR_DONE_KEEP_DAYS } from "@/lib/settings";
 import {
   createTask,
   deleteTask,
@@ -50,8 +51,8 @@ export function registerCallbacks(bot: Bot) {
         }
         await ctx.answerCallbackQuery();
         await ctx.reply(
-          "🧹 Clear all completed tasks from the done board?\nThey stay in history — only the board view resets.",
-          { reply_markup: clearDoneKeyboard() },
+          `🧹 Hide completed tasks older than <b>${CLEAR_DONE_KEEP_DAYS} days</b> from the done board?\nLast ${CLEAR_DONE_KEEP_DAYS} days stay visible. History & weekly digest are unchanged.`,
+          { parse_mode: "HTML", reply_markup: clearDoneKeyboard() },
         );
         return;
       }
@@ -76,7 +77,7 @@ export function registerCallbacks(bot: Bot) {
           });
           return;
         }
-        await updateSettings({ doneClearedAt: new Date() });
+        await updateSettings({ doneClearedAt: clearDoneCutoff() });
         await recreateBoard(ctx.api);
         await ctx.answerCallbackQuery({ text: "🧹 Cleared" });
         if (ctx.chat && ctx.callbackQuery.message) {

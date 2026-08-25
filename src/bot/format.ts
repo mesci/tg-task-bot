@@ -159,7 +159,7 @@ export function helpText(): string {
     "Use the menu under the chat:",
     "📌 Board · ➕ New task · 👤 My tasks · 👥 Team",
     "",
-    "Admins: /clearboard — hide completed tasks from the board",
+    "Admins: /clearboard — hide done tasks older than 2 days",
   ].join("\n");
 }
 

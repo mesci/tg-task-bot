@@ -23,10 +23,9 @@ import {
   listActiveMembers,
   upsertMember,
 } from "@/lib/members";
-import { getSettings, updateSettings } from "@/lib/settings";
-import { getTask, updateTask } from "@/lib/tasks";
+import { CLEAR_DONE_KEEP_DAYS, clearDoneCutoff, getSettings, updateSettings } from "@/lib/settings";
+import { getTask, listDoneForBoard, updateTask } from "@/lib/tasks";
 import { formatTaskCard } from "@/bot/format";
-import { listDoneForBoard } from "@/lib/tasks";
 
 export function registerCommands(bot: Bot) {
   bot.command("start", async (ctx) => {
@@ -126,10 +125,15 @@ export function registerCommands(bot: Bot) {
 
     await scrubTrigger(ctx);
     const settings = await getSettings();
-    const done = await listDoneForBoard(settings.doneClearedAt);
+    const visible = await listDoneForBoard(settings.doneClearedAt);
+    const keepCutoff = clearDoneCutoff();
+    const kept = visible.filter(
+      (task) => task.completedAt && task.completedAt.getTime() > keepCutoff.getTime(),
+    ).length;
+    const hidden = Math.max(0, visible.length - kept);
 
     await ctx.reply(
-      `🧹 Clear <b>${done.length}</b> completed task${done.length === 1 ? "" : "s"} from the done board?\nThey stay in history — only the board view resets.`,
+      `🧹 Hide <b>${hidden}</b> completed task${hidden === 1 ? "" : "s"} older than ${CLEAR_DONE_KEEP_DAYS} days?\n<b>${kept}</b> from the last ${CLEAR_DONE_KEEP_DAYS} days stay on the board.\nHistory & weekly digest are unchanged.`,
       {
         parse_mode: "HTML",
         reply_markup: clearDoneKeyboard(),
