@@ -6,10 +6,11 @@ import {
   showTeam,
   startCreateTask,
 } from "@/bot/actions";
-import { postToBoard, syncBoard } from "@/bot/board";
+import { postToBoard, recreateBoard, syncBoard } from "@/bot/board";
 import { formatTaskCard } from "@/bot/format";
 import {
   assigneeKeyboard,
+  clearDoneKeyboard,
   confirmDeleteKeyboard,
   createAssigneeKeyboard,
   priorityKeyboard,
@@ -19,7 +20,7 @@ import { clearFlow, deleteQuietly, sendFresh } from "@/bot/cleanup";
 import { notifyAssignee } from "@/bot/handlers/commands";
 import { getDraft, readPayload, setDraft } from "@/lib/drafts";
 import { listActiveMembers } from "@/lib/members";
-import { getSettings } from "@/lib/settings";
+import { getSettings, updateSettings } from "@/lib/settings";
 import {
   createTask,
   deleteTask,
@@ -36,6 +37,55 @@ export function registerCallbacks(bot: Bot) {
       if (data === "board:refresh") {
         await syncBoard(ctx.api);
         await ctx.answerCallbackQuery({ text: "🔄 Refreshed" });
+        return;
+      }
+
+      if (data === "board:clearask") {
+        if (!(await gateAdmin(ctx))) {
+          await ctx.answerCallbackQuery({
+            text: "Admins only",
+            show_alert: true,
+          });
+          return;
+        }
+        await ctx.answerCallbackQuery();
+        await ctx.reply(
+          "🧹 Clear all completed tasks from the done board?\nThey stay in history — only the board view resets.",
+          { reply_markup: clearDoneKeyboard() },
+        );
+        return;
+      }
+
+      if (data === "board:clearcancel") {
+        await ctx.answerCallbackQuery({ text: "Kept" });
+        if (ctx.chat && ctx.callbackQuery.message) {
+          await deleteQuietly(
+            ctx.api,
+            ctx.chat.id,
+            ctx.callbackQuery.message.message_id,
+          );
+        }
+        return;
+      }
+
+      if (data === "board:clear") {
+        if (!(await gateAdmin(ctx))) {
+          await ctx.answerCallbackQuery({
+            text: "Admins only",
+            show_alert: true,
+          });
+          return;
+        }
+        await updateSettings({ doneClearedAt: new Date() });
+        await recreateBoard(ctx.api);
+        await ctx.answerCallbackQuery({ text: "🧹 Cleared" });
+        if (ctx.chat && ctx.callbackQuery.message) {
+          await deleteQuietly(
+            ctx.api,
+            ctx.chat.id,
+            ctx.callbackQuery.message.message_id,
+          );
+        }
         return;
       }
 

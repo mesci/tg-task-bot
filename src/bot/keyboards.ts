@@ -120,7 +120,17 @@ export function boardKeyboard(): InlineKeyboard {
     .text("➕ New task", "board:new")
     .success()
     .row()
-    .text("👤 My tasks", "board:mine");
+    .text("👤 My tasks", "board:mine")
+    .text("🧹 Clear done", "board:clearask")
+    .danger();
+}
+
+export function clearDoneKeyboard(): InlineKeyboard {
+  return new InlineKeyboard()
+    .text("🧹 Yes, clear done", "board:clear")
+    .danger()
+    .text("Keep", "board:clearcancel")
+    .success();
 }
 
 export function helpKeyboard(): InlineKeyboard {

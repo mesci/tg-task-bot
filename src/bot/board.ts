@@ -2,7 +2,7 @@ import type { Api, InlineKeyboard } from "grammy";
 import { formatDoneBoard, formatOpenBoard } from "@/bot/format";
 import { boardKeyboard } from "@/bot/keyboards";
 import { getSettings, updateSettings } from "@/lib/settings";
-import { listAllDone, listOpenTasks } from "@/lib/tasks";
+import { listDoneForBoard, listOpenTasks } from "@/lib/tasks";
 
 export async function renderOpenBoardText() {
   const settings = await getSettings();
@@ -12,7 +12,7 @@ export async function renderOpenBoardText() {
 
 export async function renderDoneBoardText() {
   const settings = await getSettings();
-  const done = await listAllDone();
+  const done = await listDoneForBoard(settings.doneClearedAt);
   return formatDoneBoard({ done, timezone: settings.timezone });
 }
 

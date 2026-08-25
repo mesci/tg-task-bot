@@ -45,6 +45,7 @@ export const settings = sqliteTable("settings", {
   topicId: integer("topic_id"),
   boardMessageId: integer("board_message_id"),
   doneBoardMessageId: integer("done_board_message_id"),
+  doneClearedAt: integer("done_cleared_at", { mode: "timestamp_ms" }),
   timezone: text("timezone").notNull().default("UTC"),
   digestEnabled: integer("digest_enabled", { mode: "boolean" })
     .notNull()

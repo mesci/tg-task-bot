@@ -56,6 +56,31 @@ export async function listAllDone(): Promise<TaskWithAssignee[]> {
   return attachAssignees(rows);
 }
 
+export async function listDoneForBoard(
+  clearedAt?: Date | null,
+): Promise<TaskWithAssignee[]> {
+  const db = getDb();
+
+  const rows = clearedAt
+    ? await db
+        .select()
+        .from(schema.tasks)
+        .where(
+          and(
+            eq(schema.tasks.status, "done"),
+            sql`${schema.tasks.completedAt} > ${clearedAt.getTime()}`,
+          ),
+        )
+        .orderBy(desc(schema.tasks.completedAt))
+    : await db
+        .select()
+        .from(schema.tasks)
+        .where(eq(schema.tasks.status, "done"))
+        .orderBy(desc(schema.tasks.completedAt));
+
+  return attachAssignees(rows);
+}
+
 export async function listAllTasks(): Promise<TaskWithAssignee[]> {
   const db = getDb();
   const rows = await db

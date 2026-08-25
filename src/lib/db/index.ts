@@ -77,6 +77,7 @@ export async function ensureSchema(): Promise<void> {
         topic_id INTEGER,
         board_message_id INTEGER,
         done_board_message_id INTEGER,
+        done_cleared_at INTEGER,
         timezone TEXT NOT NULL DEFAULT 'UTC',
         digest_enabled INTEGER NOT NULL DEFAULT 1,
         standup_enabled INTEGER NOT NULL DEFAULT 1,
@@ -105,6 +106,12 @@ export async function ensureSchema(): Promise<void> {
   try {
     await client.execute(
       "ALTER TABLE settings ADD COLUMN done_board_message_id INTEGER",
+    );
+  } catch {}
+
+  try {
+    await client.execute(
+      "ALTER TABLE settings ADD COLUMN done_cleared_at INTEGER",
     );
   } catch {}
 }

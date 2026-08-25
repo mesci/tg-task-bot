@@ -14,10 +14,9 @@ import {
   showTeam,
   startCreateTask,
 } from "@/bot/actions";
-import { syncBoard } from "@/bot/board";
-import { scrubTrigger } from "@/bot/cleanup";
-import { sendFresh } from "@/bot/cleanup";
-import { createPriorityKeyboard, taskKeyboard } from "@/bot/keyboards";
+import { recreateBoard, syncBoard } from "@/bot/board";
+import { scrubTrigger, sendFresh } from "@/bot/cleanup";
+import { clearDoneKeyboard, createPriorityKeyboard, taskKeyboard } from "@/bot/keyboards";
 import { mainKeyboard } from "@/bot/menu";
 import {
   findMemberById,
@@ -27,6 +26,7 @@ import {
 import { getSettings, updateSettings } from "@/lib/settings";
 import { getTask, updateTask } from "@/lib/tasks";
 import { formatTaskCard } from "@/bot/format";
+import { listDoneForBoard } from "@/lib/tasks";
 
 export function registerCommands(bot: Bot) {
   bot.command("start", async (ctx) => {
@@ -115,6 +115,26 @@ export function registerCommands(bot: Bot) {
   bot.command("board", async (ctx) => {
     if (!(await isAllowedRoom(ctx))) return;
     await showBoard(ctx);
+  });
+
+  bot.command("clearboard", async (ctx) => {
+    if (!(await isAllowedRoom(ctx)) && ctx.chat?.type !== "private") return;
+    if (!(await gateAdmin(ctx))) {
+      await ctx.reply("🚫 Admins only.");
+      return;
+    }
+
+    await scrubTrigger(ctx);
+    const settings = await getSettings();
+    const done = await listDoneForBoard(settings.doneClearedAt);
+
+    await ctx.reply(
+      `🧹 Clear <b>${done.length}</b> completed task${done.length === 1 ? "" : "s"} from the done board?\nThey stay in history — only the board view resets.`,
+      {
+        parse_mode: "HTML",
+        reply_markup: clearDoneKeyboard(),
+      },
+    );
   });
 
   bot.command("members", async (ctx) => {
