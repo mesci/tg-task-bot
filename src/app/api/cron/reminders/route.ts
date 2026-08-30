@@ -1,5 +1,4 @@
 import { getBot } from "@/bot";
-import { syncBoard } from "@/bot/board";
 import { verifyCronRequest } from "@/lib/auth";
 import { ensureSchema } from "@/lib/db";
 import { findMemberById } from "@/lib/members";
@@ -39,10 +38,6 @@ export async function GET(request: Request) {
       await updateTask(task.id, { reminderSentAt: new Date() });
       sent += 1;
     } catch {}
-  }
-
-  if (sent > 0 && settings.chatId) {
-    await syncBoard(bot.api);
   }
 
   return Response.json({ ok: true, sent });
