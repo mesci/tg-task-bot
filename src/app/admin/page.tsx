@@ -57,6 +57,14 @@ export default async function AdminPage() {
             active: task.assignee.active,
           }
         : null,
+      assignees: task.assignees.map((person) => ({
+        id: person.id,
+        telegramId: person.telegramId,
+        username: person.username,
+        displayName: person.displayName,
+        role: person.role,
+        active: person.active,
+      })),
     })),
     counts,
   };

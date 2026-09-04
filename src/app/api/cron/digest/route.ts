@@ -50,7 +50,11 @@ export async function GET(request: Request) {
     `🔵 <b>In motion</b> · ${doing.length}`,
     ...doing.slice(0, 10).map(
       (task) =>
-        `• ${taskRef(task.id)} ${task.title}${task.assignee ? ` — ${mention(task.assignee)}` : ""}`,
+        `• ${taskRef(task.id)} ${task.title}${
+          task.assignees.length > 0
+            ? ` — ${task.assignees.map((person) => mention(person)).join(", ")}`
+            : ""
+        }`,
     ),
     "",
     `🔴 <b>Blocked</b> · ${blocked.length}`,

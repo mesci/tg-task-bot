@@ -16,7 +16,10 @@ export function formatTaskLine(
   task: TaskWithAssignee,
   timezone: string,
 ): string {
-  const who = task.assignee ? mention(task.assignee) : "<i>unassigned</i>";
+  const who =
+    task.assignees.length > 0
+      ? task.assignees.map((person) => mention(person)).join(", ")
+      : "<i>unassigned</i>";
   const due = task.dueAt
     ? ` · 📅 ${formatShortDate(task.dueAt, timezone)}`
     : "";
@@ -103,7 +106,11 @@ export function formatTaskCard(
 
   lines.push("");
   lines.push(
-    `👤  ${task.assignee ? mention(task.assignee) : "<i>unassigned</i>"}`,
+    `👤  ${
+      task.assignees.length > 0
+        ? task.assignees.map((person) => mention(person)).join(", ")
+        : "<i>unassigned</i>"
+    }`,
   );
 
   if (task.dueAt) {

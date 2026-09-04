@@ -99,6 +99,12 @@ export async function ensureSchema(): Promise<void> {
         task_id INTEGER REFERENCES tasks(id),
         created_at INTEGER NOT NULL
       )`,
+      `CREATE TABLE IF NOT EXISTS task_assignees (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        task_id INTEGER NOT NULL REFERENCES tasks(id),
+        member_id INTEGER NOT NULL REFERENCES members(id),
+        UNIQUE(task_id, member_id)
+      )`,
     ],
     "write",
   );
@@ -113,6 +119,14 @@ export async function ensureSchema(): Promise<void> {
     await client.execute(
       "ALTER TABLE settings ADD COLUMN done_cleared_at INTEGER",
     );
+  } catch {}
+
+  try {
+    await client.execute(`
+      INSERT OR IGNORE INTO task_assignees (task_id, member_id)
+      SELECT id, assignee_id FROM tasks
+      WHERE assignee_id IS NOT NULL
+    `);
   } catch {}
 }
 

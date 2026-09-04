@@ -1,5 +1,5 @@
 import { InlineKeyboard } from "grammy";
-import type { Member, Task } from "@/lib/db";
+import type { Member } from "@/lib/db";
 import type { TaskWithAssignee } from "@/lib/tasks";
 
 export function withDismiss(
@@ -14,11 +14,12 @@ export function withDismiss(
   return kb.row().text("🗑 Dismiss", `d:${ownerTelegramId}`).danger();
 }
 
-export function taskKeyboard(task: Task): InlineKeyboard {
+export function taskKeyboard(task: TaskWithAssignee): InlineKeyboard {
   const kb = new InlineKeyboard();
+  const assigned = task.assignees.length > 0;
 
   if (task.status !== "done") {
-    if (!task.assigneeId) {
+    if (!assigned) {
       kb.text("✋ Claim", `t:${task.id}:claim`).primary().row();
     }
 
@@ -35,7 +36,7 @@ export function taskKeyboard(task: Task): InlineKeyboard {
       .text("✅ Done", `t:${task.id}:done`)
       .success()
       .row();
-    kb.text("🔁 Handoff", `t:${task.id}:hand`)
+    kb.text("👥 Assign", `t:${task.id}:hand`)
       .text("⚡ Priority", `t:${task.id}:prio`)
       .text("📅 Due", `t:${task.id}:due`)
       .row();
@@ -72,17 +73,21 @@ export function priorityKeyboard(taskId: number): InlineKeyboard {
 export function assigneeKeyboard(
   taskId: number,
   members: Member[],
-  prefix: "assign" | "hand",
+  selectedIds: number[] = [],
 ): InlineKeyboard {
+  const selected = new Set(selectedIds);
   const kb = new InlineKeyboard();
   members.forEach((member, index) => {
-    kb.text(`👤 ${member.displayName}`, `t:${taskId}:${prefix}:${member.id}`);
+    const mark = selected.has(member.id) ? "✅ " : "";
+    kb.text(
+      `${mark}👤 ${member.displayName}`,
+      `t:${taskId}:hand:${member.id}`,
+    );
     if (index % 2 === 1) kb.row();
   });
   if (members.length % 2 === 1) kb.row();
-  if (prefix === "assign") {
-    kb.text("👻 Unassigned", `t:${taskId}:assign:0`).row();
-  }
+  kb.text("👻 Clear", `t:${taskId}:hand:0`).row();
+  kb.text("✅ Done", `t:${taskId}:hand:done`).success().row();
   kb.text("↩️ Back", `t:${taskId}:open`);
   return kb;
 }
@@ -101,14 +106,20 @@ export function createPriorityKeyboard(): InlineKeyboard {
     .danger();
 }
 
-export function createAssigneeKeyboard(members: Member[]): InlineKeyboard {
+export function createAssigneeKeyboard(
+  members: Member[],
+  selectedIds: number[] = [],
+): InlineKeyboard {
+  const selected = new Set(selectedIds);
   const kb = new InlineKeyboard();
   members.forEach((member, index) => {
-    kb.text(`👤 ${member.displayName}`, `c:assign:${member.id}`);
+    const mark = selected.has(member.id) ? "✅ " : "";
+    kb.text(`${mark}👤 ${member.displayName}`, `c:assign:${member.id}`);
     if (index % 2 === 1) kb.row();
   });
   if (members.length % 2 === 1) kb.row();
   kb.text("👻 Unassigned", "c:assign:0").row();
+  kb.text("✅ Continue", "c:assign:done").success().row();
   kb.text("❌ Cancel", "c:cancel").danger();
   return kb;
 }

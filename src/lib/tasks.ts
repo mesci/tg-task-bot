@@ -2,27 +2,77 @@ import { and, desc, eq, inArray, isNotNull, ne, or, sql } from "drizzle-orm";
 import { getDb, schema, type Member, type Task } from "@/lib/db";
 
 export type TaskWithAssignee = Task & {
+  assignees: Member[];
   assignee: Member | null;
 };
+
+async function setTaskAssignees(
+  taskId: number,
+  memberIds: number[],
+): Promise<void> {
+  const db = getDb();
+  const unique = [...new Set(memberIds.filter((id) => id > 0))];
+  await db
+    .delete(schema.taskAssignees)
+    .where(eq(schema.taskAssignees.taskId, taskId));
+  if (unique.length > 0) {
+    await db.insert(schema.taskAssignees).values(
+      unique.map((memberId) => ({ taskId, memberId })),
+    );
+  }
+  await db
+    .update(schema.tasks)
+    .set({ assigneeId: unique[0] ?? null, updatedAt: new Date() })
+    .where(eq(schema.tasks.id, taskId));
+}
 
 async function attachAssignees(rows: Task[]): Promise<TaskWithAssignee[]> {
   if (rows.length === 0) return [];
   const db = getDb();
-  const ids = [
-    ...new Set(rows.map((row) => row.assigneeId).filter(Boolean) as number[]),
-  ];
+  const taskIds = rows.map((row) => row.id);
+  const links = await db
+    .select()
+    .from(schema.taskAssignees)
+    .where(inArray(schema.taskAssignees.taskId, taskIds));
+
+  const memberIds = [
+    ...new Set([
+      ...links.map((link) => link.memberId),
+      ...rows.map((row) => row.assigneeId).filter(Boolean),
+    ]),
+  ] as number[];
+
   const people =
-    ids.length > 0
+    memberIds.length > 0
       ? await db
           .select()
           .from(schema.members)
-          .where(inArray(schema.members.id, ids))
+          .where(inArray(schema.members.id, memberIds))
       : [];
   const map = new Map(people.map((person) => [person.id, person]));
-  return rows.map((row) => ({
-    ...row,
-    assignee: row.assigneeId ? (map.get(row.assigneeId) ?? null) : null,
-  }));
+
+  const byTask = new Map<number, Member[]>();
+  for (const link of links) {
+    const person = map.get(link.memberId);
+    if (!person) continue;
+    const list = byTask.get(link.taskId) ?? [];
+    list.push(person);
+    byTask.set(link.taskId, list);
+  }
+
+  return rows.map((row) => {
+    let assignees = byTask.get(row.id) ?? [];
+    if (assignees.length === 0 && row.assigneeId) {
+      const fallback = map.get(row.assigneeId);
+      if (fallback) assignees = [fallback];
+    }
+    return {
+      ...row,
+      assignees,
+      assignee: assignees[0] ?? null,
+      assigneeId: assignees[0]?.id ?? null,
+    };
+  });
 }
 
 export async function listOpenTasks(): Promise<TaskWithAssignee[]> {
@@ -94,13 +144,40 @@ export async function listTasksForMember(
   memberId: number,
 ): Promise<TaskWithAssignee[]> {
   const db = getDb();
-  const rows = await db
+  const linked = await db
+    .select({ taskId: schema.taskAssignees.taskId })
+    .from(schema.taskAssignees)
+    .where(eq(schema.taskAssignees.memberId, memberId));
+  const ids = [
+    ...new Set([
+      ...linked.map((row) => row.taskId),
+    ]),
+  ];
+
+  const legacy = await db
     .select()
     .from(schema.tasks)
     .where(
       and(eq(schema.tasks.assigneeId, memberId), ne(schema.tasks.status, "done")),
-    )
-    .orderBy(desc(schema.tasks.updatedAt));
+    );
+
+  const fromLinks =
+    ids.length > 0
+      ? await db
+          .select()
+          .from(schema.tasks)
+          .where(
+            and(inArray(schema.tasks.id, ids), ne(schema.tasks.status, "done")),
+          )
+      : [];
+
+  const byId = new Map<number, Task>();
+  for (const row of [...fromLinks, ...legacy]) {
+    byId.set(row.id, row);
+  }
+  const rows = [...byId.values()].sort(
+    (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
+  );
   return attachAssignees(rows);
 }
 
@@ -121,24 +198,34 @@ export async function createTask(input: {
   description?: string | null;
   priority?: Task["priority"];
   assigneeId?: number | null;
+  assigneeIds?: number[];
   createdById?: number | null;
   dueAt?: Date | null;
 }): Promise<TaskWithAssignee> {
   const db = getDb();
   const now = new Date();
+  const assigneeIds =
+    input.assigneeIds ??
+    (input.assigneeId != null && input.assigneeId > 0
+      ? [input.assigneeId]
+      : []);
+  const primary = assigneeIds[0] ?? null;
+
   const [created] = await db
     .insert(schema.tasks)
     .values({
       title: input.title.trim(),
       description: input.description?.trim() || null,
       priority: input.priority ?? "normal",
-      assigneeId: input.assigneeId ?? null,
+      assigneeId: primary,
       createdById: input.createdById ?? null,
       dueAt: input.dueAt ?? null,
       createdAt: now,
       updatedAt: now,
     })
     .returning();
+
+  await setTaskAssignees(created.id, assigneeIds);
   const task = await getTask(created.id);
   return task!;
 }
@@ -151,6 +238,7 @@ export async function updateTask(
     status: Task["status"];
     priority: Task["priority"];
     assigneeId: number | null;
+    assigneeIds: number[];
     dueAt: Date | null;
     blockedReason: string | null;
     reminderSentAt: Date | null;
@@ -159,8 +247,9 @@ export async function updateTask(
   }>,
 ): Promise<TaskWithAssignee | null> {
   const db = getDb();
-  const next = {
-    ...patch,
+  const { assigneeIds, assigneeId, ...rest } = patch;
+  const next: Record<string, unknown> = {
+    ...rest,
     updatedAt: new Date(),
   };
 
@@ -174,17 +263,47 @@ export async function updateTask(
     next.blockedReason = patch.blockedReason ?? null;
   }
 
+  if (assigneeIds !== undefined) {
+    next.assigneeId = assigneeIds[0] ?? null;
+  } else if (assigneeId !== undefined) {
+    next.assigneeId = assigneeId;
+  }
+
   const [updated] = await db
     .update(schema.tasks)
     .set(next)
     .where(eq(schema.tasks.id, id))
     .returning();
   if (!updated) return null;
+
+  if (assigneeIds !== undefined) {
+    await setTaskAssignees(id, assigneeIds);
+  } else if (assigneeId !== undefined) {
+    await setTaskAssignees(id, assigneeId && assigneeId > 0 ? [assigneeId] : []);
+  }
+
   return getTask(id);
+}
+
+export async function addTaskAssignee(
+  taskId: number,
+  memberId: number,
+): Promise<TaskWithAssignee | null> {
+  const task = await getTask(taskId);
+  if (!task) return null;
+  if (task.assignees.some((person) => person.id === memberId)) {
+    return task;
+  }
+  return updateTask(taskId, {
+    assigneeIds: [...task.assignees.map((person) => person.id), memberId],
+  });
 }
 
 export async function deleteTask(id: number): Promise<boolean> {
   const db = getDb();
+  await db
+    .delete(schema.taskAssignees)
+    .where(eq(schema.taskAssignees.taskId, id));
   const deleted = await db
     .delete(schema.tasks)
     .where(eq(schema.tasks.id, id))

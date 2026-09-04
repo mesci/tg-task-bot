@@ -6,6 +6,7 @@ export type DraftPayload = {
   description?: string | null;
   priority?: "low" | "normal" | "high" | "urgent";
   assigneeId?: number | null;
+  assigneeIds?: number[];
   dueAt?: string | null;
   taskId?: number;
   handoffFrom?: number;

@@ -22,6 +22,7 @@ export type Task = {
   dueAt: string | null;
   blockedReason: string | null;
   assignee: Member | null;
+  assignees: Member[];
 };
 
 export type Settings = {
@@ -223,8 +224,10 @@ function OverviewPanel({
                   </p>
                   <p className="text-sm text-muted">
                     {task.status}
-                    {task.assignee
-                      ? ` · ${task.assignee.displayName}`
+                    {task.assignees.length > 0
+                      ? ` · ${task.assignees
+                          .map((person) => person.displayName)
+                          .join(", ")}`
                       : " · unassigned"}
                     {task.blockedReason ? ` · ${task.blockedReason}` : ""}
                   </p>
@@ -390,8 +393,16 @@ function TasksPanel({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("normal");
-  const [assigneeId, setAssigneeId] = useState("");
+  const [assigneeIds, setAssigneeIds] = useState<number[]>([]);
   const [dueAt, setDueAt] = useState("");
+
+  function toggleAssignee(id: number) {
+    setAssigneeIds((current) =>
+      current.includes(id)
+        ? current.filter((value) => value !== id)
+        : [...current, id],
+    );
+  }
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -402,7 +413,7 @@ function TasksPanel({
         title,
         description,
         priority,
-        assigneeId: assigneeId ? Number(assigneeId) : null,
+        assigneeIds,
         dueAt: dueAt || null,
       }),
     });
@@ -413,7 +424,7 @@ function TasksPanel({
     setTitle("");
     setDescription("");
     setPriority("normal");
-    setAssigneeId("");
+    setAssigneeIds([]);
     setDueAt("");
     onNotice("Task created.");
     await onChange();
@@ -473,23 +484,30 @@ function TasksPanel({
             <option value="urgent">urgent</option>
           </select>
         </label>
-        <label className="block space-y-2">
-          <span className="text-sm uppercase tracking-[0.18em] text-muted">
-            Assignee
-          </span>
-          <select
-            value={assigneeId}
-            onChange={(event) => setAssigneeId(event.target.value)}
-            className="w-full rounded-2xl border border-line bg-white/80 px-4 py-3"
-          >
-            <option value="">Unassigned</option>
-            {members.map((member) => (
-              <option key={member.id} value={member.id}>
-                {member.displayName}
-              </option>
-            ))}
-          </select>
-        </label>
+        <fieldset className="space-y-2">
+          <legend className="text-sm uppercase tracking-[0.18em] text-muted">
+            Assignees
+          </legend>
+          <div className="max-h-40 space-y-2 overflow-y-auto rounded-2xl border border-line bg-white/80 p-3">
+            {members.length === 0 ? (
+              <p className="text-sm text-muted">No members yet.</p>
+            ) : (
+              members.map((member) => (
+                <label
+                  key={member.id}
+                  className="flex items-center gap-2 text-sm"
+                >
+                  <input
+                    type="checkbox"
+                    checked={assigneeIds.includes(member.id)}
+                    onChange={() => toggleAssignee(member.id)}
+                  />
+                  {member.displayName}
+                </label>
+              ))
+            )}
+          </div>
+        </fieldset>
         <Field label="Due date" value={dueAt} onChange={setDueAt} type="date" />
         <button className="w-full rounded-2xl bg-ink px-4 py-3 text-accent">
           Create task
@@ -511,6 +529,13 @@ function TasksPanel({
                   </p>
                   <p className="text-sm text-muted">
                     {task.description || "No description"}
+                  </p>
+                  <p className="mt-1 text-sm text-muted">
+                    {task.assignees.length > 0
+                      ? task.assignees
+                          .map((person) => person.displayName)
+                          .join(", ")
+                      : "Unassigned"}
                   </p>
                 </div>
                 <button

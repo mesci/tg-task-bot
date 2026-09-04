@@ -215,12 +215,23 @@ export async function notifyAssignee(
   text: string,
 ) {
   if (!assigneeId) return;
-  const member = await findMemberById(assigneeId);
-  if (!member) return;
-  try {
-    await bot.api.sendMessage(member.telegramId, text, {
-      parse_mode: "HTML",
-      reply_markup: mainKeyboard(),
-    });
-  } catch {}
+  await notifyAssignees(bot, [assigneeId], text);
+}
+
+export async function notifyAssignees(
+  bot: Bot,
+  assigneeIds: number[],
+  text: string,
+) {
+  const unique = [...new Set(assigneeIds.filter((id) => id > 0))];
+  for (const assigneeId of unique) {
+    const member = await findMemberById(assigneeId);
+    if (!member) continue;
+    try {
+      await bot.api.sendMessage(member.telegramId, text, {
+        parse_mode: "HTML",
+        reply_markup: mainKeyboard(),
+      });
+    } catch {}
+  }
 }

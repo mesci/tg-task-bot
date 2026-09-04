@@ -17,12 +17,13 @@ import {
   taskKeyboard,
 } from "@/bot/keyboards";
 import { clearFlow, deleteQuietly, sendFresh } from "@/bot/cleanup";
-import { notifyAssignee } from "@/bot/handlers/commands";
+import { notifyAssignees } from "@/bot/handlers/commands";
 import { getDraft, readPayload, setDraft } from "@/lib/drafts";
 import { listActiveMembers } from "@/lib/members";
 import { clearDoneCutoff, getSettings, updateSettings } from "@/lib/settings";
 import { CLEAR_DONE_KEEP_DAYS } from "@/lib/settings";
 import {
+  addTaskAssignee,
   createTask,
   deleteTask,
   getTask,
@@ -232,9 +233,12 @@ async function handleCreatePriority(ctx: Context, priority: string) {
 
   const members = await listActiveMembers();
   await ctx.answerCallbackQuery();
-  await ctx.editMessageText("👤 Who should own this?", {
-    reply_markup: createAssigneeKeyboard(members),
-  });
+  await ctx.editMessageText(
+    "👤 Who should own this?\nTap to toggle · ✅ Continue when ready.",
+    {
+      reply_markup: createAssigneeKeyboard(members, []),
+    },
+  );
 }
 
 async function handleCreateAssign(ctx: Context, rawId: string) {
@@ -248,23 +252,57 @@ async function handleCreateAssign(ctx: Context, rawId: string) {
   }
 
   const payload = readPayload(draft);
-  const assigneeId = Number(rawId);
+  const selected = [...(payload.assigneeIds ?? [])];
+
+  if (rawId === "done" || rawId === "0") {
+    const assigneeIds = rawId === "0" ? [] : selected;
+    await setDraft({
+      telegramId: String(ctx.from!.id),
+      chatId: draft.chatId,
+      topicId: draft.topicId,
+      step: "create_due",
+      payload: {
+        ...payload,
+        assigneeIds,
+        assigneeId: assigneeIds[0] ?? null,
+      },
+    });
+
+    await ctx.answerCallbackQuery();
+    await ctx.editMessageText(
+      "📅 <b>Due date?</b>\nSend <code>YYYY-MM-DD</code>, <code>today</code>, <code>tomorrow</code>, or <code>skip</code>.",
+      { parse_mode: "HTML" },
+    );
+    return;
+  }
+
+  const memberId = Number(rawId);
+  if (!(memberId > 0)) {
+    await ctx.answerCallbackQuery({ text: "Invalid", show_alert: true });
+    return;
+  }
+
+  const next = selected.includes(memberId)
+    ? selected.filter((id) => id !== memberId)
+    : [...selected, memberId];
+
   await setDraft({
     telegramId: String(ctx.from!.id),
     chatId: draft.chatId,
     topicId: draft.topicId,
-    step: "create_due",
+    step: "create_assignee",
     payload: {
       ...payload,
-      assigneeId: assigneeId > 0 ? assigneeId : null,
+      assigneeIds: next,
+      assigneeId: next[0] ?? null,
     },
   });
 
+  const members = await listActiveMembers();
   await ctx.answerCallbackQuery();
-  await ctx.editMessageText(
-    "📅 <b>Due date?</b>\nSend <code>YYYY-MM-DD</code>, <code>today</code>, <code>tomorrow</code>, or <code>skip</code>.",
-    { parse_mode: "HTML" },
-  );
+  await ctx.editMessageReplyMarkup({
+    reply_markup: createAssigneeKeyboard(members, next),
+  });
 }
 
 async function handleTaskAction(bot: Bot, ctx: Context, data: string) {
@@ -320,15 +358,16 @@ async function handleTaskAction(bot: Bot, ctx: Context, data: string) {
   }
 
   if (action === "claim") {
-    const updated = await updateTask(taskId, {
-      assigneeId: member.id,
-      status: task.status === "todo" ? "doing" : task.status,
-    });
+    const updated = await addTaskAssignee(taskId, member.id);
+    const withStatus =
+      updated && task.status === "todo"
+        ? await updateTask(taskId, { status: "doing" })
+        : updated;
     await ctx.answerCallbackQuery({ text: "✋ Claimed" });
-    if (updated) {
-      await ctx.editMessageText(formatTaskCard(updated, settings.timezone), {
+    if (withStatus) {
+      await ctx.editMessageText(formatTaskCard(withStatus, settings.timezone), {
         parse_mode: "HTML",
-        reply_markup: taskKeyboard(updated),
+        reply_markup: taskKeyboard(withStatus),
       });
     }
     await syncBoard(ctx.api);
@@ -409,34 +448,65 @@ async function handleTaskAction(bot: Bot, ctx: Context, data: string) {
     const members = await listActiveMembers();
     await ctx.answerCallbackQuery();
     await ctx.editMessageReplyMarkup({
-      reply_markup: assigneeKeyboard(taskId, members, "hand"),
+      reply_markup: assigneeKeyboard(
+        taskId,
+        members,
+        task.assignees.map((person) => person.id),
+      ),
     });
     return;
   }
 
-  if (action === "hand" && arg) {
-    const assigneeId = Number(arg);
-    const updated = await updateTask(taskId, { assigneeId });
-    await ctx.answerCallbackQuery({ text: "🔁 Handed off" });
-    if (updated) {
-      await ctx.editMessageText(formatTaskCard(updated, settings.timezone), {
+  if (action === "hand" && arg === "done") {
+    await ctx.answerCallbackQuery({ text: "👥 Assignees updated" });
+    const latest = await getTask(taskId);
+    if (latest) {
+      await ctx.editMessageText(formatTaskCard(latest, settings.timezone), {
         parse_mode: "HTML",
-        reply_markup: taskKeyboard(updated),
+        reply_markup: taskKeyboard(latest),
       });
-      await notifyAssignee(
-        bot,
-        assigneeId,
-        `🔁 Handed to you: <b>${taskRef(taskId)}</b> ${escapeHtml(task.title)}\nfrom ${mention(member)}`,
-      );
     }
     await syncBoard(ctx.api);
     return;
   }
 
+  if (action === "hand" && arg) {
+    const memberId = Number(arg);
+    const current = task.assignees.map((person) => person.id);
+    let next: number[];
+    let added: number | null = null;
+
+    if (memberId === 0) {
+      next = [];
+    } else if (current.includes(memberId)) {
+      next = current.filter((id) => id !== memberId);
+    } else {
+      next = [...current, memberId];
+      added = memberId;
+    }
+
+    const updated = await updateTask(taskId, { assigneeIds: next });
+    const members = await listActiveMembers();
+    await ctx.answerCallbackQuery();
+    if (updated) {
+      await ctx.editMessageReplyMarkup({
+        reply_markup: assigneeKeyboard(taskId, members, next),
+      });
+    }
+    if (added) {
+      await notifyAssignees(
+        bot,
+        [added],
+        `🛠 Assigned to you: <b>${taskRef(taskId)}</b> ${escapeHtml(task.title)}\nby ${mention(member)}`,
+      );
+    }
+    return;
+  }
+
   if (action === "assign" && arg) {
-    const assigneeId = Number(arg);
+    const memberId = Number(arg);
     const updated = await updateTask(taskId, {
-      assigneeId: assigneeId > 0 ? assigneeId : null,
+      assigneeIds: memberId > 0 ? [memberId] : [],
     });
     await ctx.answerCallbackQuery({ text: "👤 Assignee updated" });
     if (updated) {
@@ -484,7 +554,11 @@ export async function finalizeTaskCreate(bot: Bot, ctx: Context) {
     title: payload.title,
     description: payload.description ?? null,
     priority: payload.priority ?? "normal",
-    assigneeId: payload.assigneeId ?? null,
+    assigneeIds:
+      payload.assigneeIds ??
+      (payload.assigneeId != null && payload.assigneeId > 0
+        ? [payload.assigneeId]
+        : []),
     createdById: member?.id ?? null,
     dueAt,
   });
@@ -510,9 +584,9 @@ export async function finalizeTaskCreate(bot: Bot, ctx: Context) {
   }
 
   await syncBoard(ctx.api);
-  await notifyAssignee(
+  await notifyAssignees(
     bot,
-    task.assigneeId,
+    task.assignees.map((person) => person.id),
     `🛠 Assigned to you: <b>${taskRef(task.id)}</b> ${escapeHtml(task.title)}`,
   );
   return true;

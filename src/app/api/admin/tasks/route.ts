@@ -26,6 +26,7 @@ export async function POST(request: Request) {
     description?: string;
     priority?: "low" | "normal" | "high" | "urgent";
     assigneeId?: number | null;
+    assigneeIds?: number[];
     dueAt?: string | null;
   };
 
@@ -33,11 +34,15 @@ export async function POST(request: Request) {
     return Response.json({ ok: false }, { status: 400 });
   }
 
+  const assigneeIds =
+    body.assigneeIds ??
+    (body.assigneeId != null && body.assigneeId > 0 ? [body.assigneeId] : []);
+
   const task = await createTask({
     title: body.title,
     description: body.description ?? null,
     priority: body.priority ?? "normal",
-    assigneeId: body.assigneeId ?? null,
+    assigneeIds,
     dueAt: body.dueAt ? new Date(body.dueAt) : null,
   });
 
@@ -60,6 +65,7 @@ export async function PATCH(request: Request) {
     status?: "todo" | "doing" | "blocked" | "done";
     priority?: "low" | "normal" | "high" | "urgent";
     assigneeId?: number | null;
+    assigneeIds?: number[];
     dueAt?: string | null;
     blockedReason?: string | null;
   };
@@ -74,6 +80,7 @@ export async function PATCH(request: Request) {
     status: body.status,
     priority: body.priority,
     assigneeId: body.assigneeId,
+    assigneeIds: body.assigneeIds,
     dueAt: body.dueAt === undefined ? undefined : body.dueAt ? new Date(body.dueAt) : null,
     blockedReason: body.blockedReason,
   });

@@ -1,7 +1,6 @@
 import { getBot } from "@/bot";
 import { verifyCronRequest } from "@/lib/auth";
 import { ensureSchema } from "@/lib/db";
-import { findMemberById } from "@/lib/members";
 import { getSettings } from "@/lib/settings";
 import { listTasksNeedingReminder, updateTask } from "@/lib/tasks";
 import { formatDue } from "@/lib/time";
@@ -26,18 +25,22 @@ export async function GET(request: Request) {
   let sent = 0;
 
   for (const task of due) {
-    if (!task.assigneeId || !task.dueAt) continue;
-    const member = await findMemberById(task.assigneeId);
-    if (!member) continue;
+    if (task.assignees.length === 0 || !task.dueAt) continue;
 
     const text = `⏰ <b>Reminder</b>\n${taskRef(task.id)} ${task.title}\n📅 Due ${formatDue(task.dueAt, settings.timezone)}`;
-    try {
-      await bot.api.sendMessage(member.telegramId, text, {
-        parse_mode: "HTML",
-      });
+    let anySent = false;
+    for (const member of task.assignees) {
+      try {
+        await bot.api.sendMessage(member.telegramId, text, {
+          parse_mode: "HTML",
+        });
+        anySent = true;
+        sent += 1;
+      } catch {}
+    }
+    if (anySent) {
       await updateTask(task.id, { reminderSentAt: new Date() });
-      sent += 1;
-    } catch {}
+    }
   }
 
   return Response.json({ ok: true, sent });

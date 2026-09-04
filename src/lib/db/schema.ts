@@ -39,6 +39,16 @@ export const tasks = sqliteTable("tasks", {
     .$defaultFn(() => new Date()),
 });
 
+export const taskAssignees = sqliteTable("task_assignees", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  taskId: integer("task_id")
+    .notNull()
+    .references(() => tasks.id),
+  memberId: integer("member_id")
+    .notNull()
+    .references(() => members.id),
+});
+
 export const settings = sqliteTable("settings", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   chatId: text("chat_id"),
